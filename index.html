@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Pro Drift Simulator - Anti-Stuck System</title>
+    <link rel="preconnect" href="https://googleapis.com">
+    <link rel="preconnect" href="https://gstatic.com" crossorigin>
+    <link href="https://googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #0c0d12; font-family: 'Share Tech Mono', monospace; }
+        #menu-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #161920 0%, #07090e 100%); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 25px; transition: opacity 0.4s ease, transform 0.4s ease; }
+        .menu-title { color: #ffffff; font-size: 3.8rem; font-weight: 900; letter-spacing: 5px; text-transform: uppercase; transform: skewX(-8deg); text-shadow: 0 0 30px rgba(255, 255, 255, 0.1); }
+        .menu-title span { color: #ffcc00; text-shadow: 0 0 25px rgba(255, 204, 0, 0.5); }
+        .start-btn { background: #ffcc00; color: #04060b; border: none; padding: 18px 70px; font-size: 2rem; font-weight: 900; transform: skewX(-10deg); cursor: pointer; border-radius: 10px; box-shadow: 0 0 30px rgba(255, 204, 0, 0.45); }
+        #gameCanvas { width: 100%; height: 100%; display: block; position: absolute; top: 0; left: 0; z-index: 1; opacity: 0; transition: opacity 0.5s ease; }
+        #ui-container, .g-force-container, #drift-hud, #score-board { opacity: 0; transition: opacity 0.5s ease; }
+
+        #score-board { position: absolute; top: 40px; left: 40px; z-index: 10; background: rgba(12, 16, 26, 0.92); padding: 15px 25px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); }
+        .score-label { font-size: 0.75rem; color: #8397af; letter-spacing: 2px; text-transform: uppercase; }
+        .score-val { color: #ffffff; font-size: 2.2rem; font-weight: 900; }
+
+        #drift-hud { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 10; text-align: center; font-weight: bold; pointer-events: none; width: 600px; }
+        #drift-score { color: #ffffff; font-size: 3.5rem; text-shadow: 0 0 20px rgba(255,255,255,0.7); transform: skewX(-8deg); transition: color 0.15s ease; }
+        #drift-multiplier { color: #ffcc00; font-size: 1.6rem; text-shadow: 0 0 12px rgba(255,204,0,0.6); margin-top: -2px; transform: skewX(-6deg); }
+
+        #ui-container { position: absolute; bottom: 40px; right: 40px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: flex-end; background: rgba(12, 16, 26, 0.92); padding: 22px 32px; border-radius: 16px; border: 1px solid rgba(255, 204, 0, 0.3); backdrop-filter: blur(20px); box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8); }
+        #speedometer { color: #ffcc00; font-size: 5.5rem; font-weight: 900; line-height: 0.85; letter-spacing: -3px; transform: skewX(-10deg); font-variant-numeric: tabular-nums; text-shadow: 0 0 25px rgba(255, 204, 0, 0.6); }
+        .hud-label { font-size: 0.85rem; color: #8397af; letter-spacing: 4px; text-transform: uppercase; font-weight: bold; transform: skewX(-6deg); }
+        .g-force-container { position: absolute; bottom: 40px; left: 40px; z-index: 10; pointer-events: none; background: rgba(12, 16, 26, 0.92); border-radius: 50%; width: 125px; height: 125px; border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8); }
+        .g-force-grid { position: absolute; width: 82%; height: 82%; border-radius: 50%; border: 1px dashed rgba(255, 204, 0, 0.3); }
+        .g-dot { width: 10px; height: 10px; background-color: #ff2a2a; border-radius: 50%; box-shadow: 0 0 18px #ff2a2a; position: absolute; left: calc(50% - 5px); top: calc(50% - 5px); }
+    </style>
+</head>
+<body>
+
+<div id="menu-container">
+    <div class="menu-title">Arena <span>Drift</span></div>
+    <button class="start-btn" id="startBtn">СТАРТ</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="score-board">
+    <div class="score-label">TOTAL SCORE</div>
+    <div id="total-score-val" class="score-val">000000</div>
+</div>
+
+<div class="g-force-container" id="gForceHUD">
+    <div class="g-force-grid"></div>
+    <div id="gDot" class="g-dot"></div>
+</div>
+
+<div id="drift-hud">
+    <div id="drift-score">DRIVE AND DRIFT</div>
+    <div id="drift-multiplier" style="visibility: hidden;">x1.0 MULTIPLIER</div>
+</div>
+
+<div id="ui-container">
+    <div class="hud-label" style="color: #ffcc00; font-size: 0.78rem;">LIMIT SPEED: 210 KM/H</div>
+    <div id="speedometer">000</div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const menu = document.getElementById('menu-container');
+    const startBtn = document.getElementById('startBtn');
+    const hudR = document.getElementById('ui-container');
+    const hudL = document.getElementById('gForceHUD');
+    const driftHud = document.getElementById('drift-hud');
+    const scoreBoard = document.getElementById('score-board');
+    const speedometer = document.getElementById('speedometer');
+    const gDot = document.getElementById('gDot');
+    const driftScoreEl = document.getElementById('drift-score');
+    const driftMultEl = document.getElementById('drift-multiplier');
+    const totalScoreVal = document.getElementById('total-score-val');
+
+    let isRunning = false;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    let car = {
+        x: 0, y: 0, vx: 0, vy: 0,
+        angle: 0, angularVelocity: 0, steerAngle: 0,
+        speed: 0, power: 0.22, maxSpeedPhys: 13.12, brake: 0.35, drag: 0.03, maxSteer: 0.52
+    };
+
+    let totalPoints = 0;
+    let currentDriftScore = 0;
+    let driftMultiplier = 1.0;
+    let isDrifting = false;
+    let collisionTextTimer = 0;
+    let collisionCooldown = 0; // Таймер неуязвимости (в кадрах)
+
+    const keys = { w: false, a: false, s: false, d: false, ' ': false };
+    window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = true; if (e.key === ' ') keys[' '] = true; });
+    window.addEventListener('keyup', (e) => { if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false; if (e.key === ' ') keys[' '] = false; });
+
+    const containers = [];
+    const containerColors = ['#1d4ed8', '#b91c1c', '#047857', '#6b21a8', '#c2410c'];
+    const minDistance = 320;
+
+    function checkCollisionFree(x, y) {
+        if (Math.abs(x) < 250 && Math.abs(y) < 250) return false;
+        for (let i = 0; i < containers.length; i++) {
+            let dx = containers[i].x - x;
+            let dy = containers[i].y - y;
+            if (Math.sqrt(dx * dx + dy * dy) < minDistance) return false;
+        }
+        return true;
+    }
+
+    for (let i = 0; i < 45; i++) {
+        let valid = false;
+        let cx = 0, cy = 0;
+        while (!valid) {
+            cx = (Math.random() - 0.5) * 4000;
+            cy = (Math.random() - 0.5) * 4000;
+            if (checkCollisionFree(cx, cy)) valid = true;
+        }
+        containers.push({
+            x: cx, y: cy, w: 120, h: 50,
+            angle: (Math.floor(Math.random() * 4) * Math.PI) / 2,
+            color: containerColors[Math.floor(Math.random() * containerColors.length)]
+        });
+    }
+
+    const roadLines = [];
+    for(let i=0; i<60; i++) {
+        roadLines.push({ x: (Math.random() - 0.5) * 4000, y: (Math.random() - 0.5) * 4000, w: 8 + Math.random() * 6, h: 40 + Math.random() * 80, angle: Math.random() * Math.PI });
+    }
+
+    let smokeParticles = [];
+    let tireTracks = [];
+
+    startBtn.addEventListener('click', () => {
+        menu.style.opacity = '0';
+        setTimeout(() => {
+            menu.style.display = 'none';
+            canvas.style.opacity = '1';
+            hudR.style.opacity = '1';
+            hudL.style.opacity = '1';
+            driftHud.style.opacity = '1';
+            scoreBoard.style.opacity = '1';
+            isRunning = true;
+            loop();
+        }, 400);
+    });
+
+    window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    });
+
+    function checkCarCollisionWithContainer(box) {
+        let dx = car.x - box.x;
+        let dy = car.y - box.y;
+        let cosB = Math.cos(-box.angle);
+        let sinB = Math.sin(-box.angle);
+        let rx = dx * cosB - dy * sinB;
+        let ry = dx * sinB + dy * cosB;
+
+        let cW = box.w / 2;
+        let cH = box.h / 2;
+        let carW = 10;
+        let carH = 22;
+
+        if (Math.abs(rx) < (cW + carW) && Math.abs(ry) < (cH + carH)) {
+            let overlapX = (cW + carW) - Math.abs(rx);
+            let overlapY = (cH + carH) - Math.abs(ry);
+
+            if (overlapX < overlapY) {
+                let pushX = rx > 0 ? overlapX : -overlapX;
+                car.x += pushX * Math.cos(box.angle);
+                car.y += pushX * Math.sin(box.angle);
+            } else {
+                let pushY = ry > 0 ? overlapY : -overlapY;
+                car.x -= pushY * Math.sin(box.angle);
+                car.y += pushY * Math.cos(box.angle);
+            }
+
+            car.vx = -car.vx * 0.15;
+            car.vy = -car.vy * 0.15;
+            car.speed = 0;
+            return true;
+        }
+        return false;
+    }
+
+    function loop() {
+        if (!isRunning) return;
+        requestAnimationFrame(loop);
+
+        let speedScalar = Math.sqrt(car.vx * car.vx + car.vy * car.vy);
+
+        let steerInput = 0;
+        if (keys.a) steerInput = -1;
+        if (keys.d) steerInput = 1;
+
+        if (steerInput !== 0) car.steerAngle = Math.max(Math.min(car.steerAngle + steerInput * 0.05, car.maxSteer), -car.maxSteer);
+        else car.steerAngle *= 0.70;
+
+        if (keys.w) car.speed = Math.min(car.speed + car.power, car.maxSpeedPhys);
+        if (keys.s) car.speed = Math.max(car.speed - car.brake, -car.maxSpeedPhys / 3);
+        if (!keys.w && !keys.s) car.speed *= 0.97;
+
+        let frontGrip = 0.99;
+        let rearGrip = 0.98;
+
+        if (keys[' '] && speedScalar > 2.0) {
+            isDrifting = true;
+        }
+
+        if (isDrifting) {
+            rearGrip = 0.02;
+        }
+
+        let cosA = Math.cos(car.angle);
+        let sinA = Math.sin(car.angle);
+        let targetVx = sinA * car.speed;
+        let targetVy = -cosA * car.speed;
+
+        if (isDrifting) {
+            car.vx = car.vx * 0.975 + targetVx * 0.025;
+            car.vy = car.vy * 0.975 + targetVy * 0.025;
+        } else {
+            car.vx += (targetVx - car.vx) * ((frontGrip + rearGrip) / 2);
+            car.vy += (targetVy - car.vy) * ((frontGrip + rearGrip) / 2);
+        }
+
+        let localVx = car.vx * Math.cos(-car.angle) - car.vy * Math.sin(-car.angle);
+        let localVy = car.vx * Math.sin(-car.angle) + car.vy * Math.cos(-car.angle);
+        let driftSlip = Math.abs(localVx);
+
+        if (speedScalar > 0.8) {
+            if (isDrifting) {
+                car.angularVelocity += car.steerAngle * localVy * 0.0007 - localVx * 0.0008;
+            } else {
+                car.angularVelocity = car.steerAngle * speedScalar * 0.0035;
+            }
+        }
+
+        car.angularVelocity *= isDrifting ? 0.84 : 0.72;
+        car.angle += car.angularVelocity;
+
+        car.x += car.vx;
+        car.y += car.vy;
+
+        // ДЕКРЕМЕНТ ТАЙМЕРА НЕУЯЗВИМОСТИ
+        if (collisionCooldown > 0) {
+            collisionCooldown--;
+        }
+
+        // ОБСЧЕТ СТОЛКНОВЕНИЙ С УЧЕТОМ ВРЕМЕННОЙ НЕУЯЗВИМОСТИ
+        for(let i=0; i<containers.length; i++) {
+            if (checkCarCollisionWithContainer(containers[i])) {
+                if (collisionCooldown === 0) { // Штраф накладывается только один раз за удар!
+                    currentDriftScore = 0;
+                    driftMultiplier = 1.0;
+                    isDrifting = false;
+
+                    // Уменьшено со 1000 до 100 очков по ТЗ
+                    totalPoints = Math.max(0, totalPoints - 100);
+                    totalScoreVal.innerText = totalPoints.toString().padStart(6, '0');
+
+                    collisionTextTimer = 60;
+                    collisionCooldown = 90; // Игрок неуязвим на 1.5 секунды (90 кадров при 60 FPS)
+                    driftScoreEl.innerText = "-100 ОЧКОВ";
+                    driftScoreEl.style.color = "#ff3333";
+                    driftMultEl.style.visibility = 'hidden';
+                }
+                break;
+            }
+        }
+
+        if (driftSlip < 0.45 && !keys[' ']) {
+            isDrifting = false;
+        }
+
+        if (collisionTextTimer > 0) {
+            collisionTextTimer--;
+        } else {
+            driftScoreEl.style.color = "#ffffff";
+            if (isDrifting && speedScalar > 2.0 && driftSlip > 0.8) {
+                currentDriftScore += Math.floor(driftSlip * 15 * driftMultiplier);
+                driftMultiplier = Math.min(driftMultiplier + 0.006, 5.0);
+                driftScoreEl.innerText = currentDriftScore.toString();
+                driftMultEl.style.visibility = 'visible';
+                driftMultEl.innerText = `x${driftMultiplier.toFixed(1)} ASPHALT COMBO`;
+                driftScoreEl.style.color = "#ffcc00";
+            } else {
+                if (currentDriftScore > 0) {
+                    totalPoints += currentDriftScore;
+                    currentDriftScore = 0;
+                    driftMultiplier = 1.0;
+                    totalScoreVal.innerText = totalPoints.toString().padStart(6, '0');
+                    setTimeout(() => { if (currentDriftScore === 0 && collisionTextTimer <= 0) driftMultEl.style.visibility = 'hidden'; }, 1500);
+                }
+                if (collisionTextTimer <= 0) {
+                    driftScoreEl.innerText = "DRIFT ARENA";
+                }
+            }
+        }
+
+        if (speedScalar > 0.5 && isDrifting) {
+            let leftTrackX = car.x - Math.sin(car.angle) * 14 - Math.cos(car.angle) * 12;
+            let leftTrackY = car.y + Math.cos(car.angle) * 14 - Math.sin(car.angle) * 12;
+            let rightTrackX = car.x - Math.sin(car.angle) * 14 + Math.cos(car.angle) * 12;
+            let rightTrackY = car.y + Math.cos(car.angle) * 14 + Math.sin(car.angle) * 12;
+            tireTracks.push({ x1: leftTrackX, y1: leftTrackY, x2: rightTrackX, y2: rightTrackY, alpha: 0.8 });
+            if (tireTracks.length > 700) tireTracks.shift();
+        }
+
+        if (speedScalar > 0.8 && isDrifting) {
+            let backX = car.x - Math.sin(car.angle) * 24;
+            let backY = car.y + Math.cos(car.angle) * 24;
+            for(let p=0; p<4; p++) {
+                smokeParticles.push({
+                    x: backX + (Math.random() - 0.5) * 14, y: backY + (Math.random() - 0.5) * 14,
+                    vx: -car.vx * 0.12 + (Math.random() - 0.5) * 1.5, vy: -car.vy * 0.12 + (Math.random() - 0.5) * 1.5,
+                    size: 4 + Math.random() * 8, alpha: 0.70
+                });
+            }
+        }
+        if (smokeParticles.length > 400) smokeParticles.shift();
+
+        let shakeIntensity = (isDrifting && driftSlip > 1.3) ? (Math.random() - 0.5) * (driftSlip * 1.3) : 0;
+
+        ctx.save();
+        ctx.translate(width / 2 + shakeIntensity, height / 2 + shakeIntensity);
+
+        ctx.fillStyle = '#1c1f26';
+        ctx.fillRect(-width, -height, width * 2, height * 2);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        roadLines.forEach(line => {
+            ctx.save();
+            let rx = ((line.x - car.x) % 2500 + 2500) % 2500 - 1250;
+            let ry = ((line.y - car.y) % 2500 + 2500) % 2500 - 1250;
+            ctx.translate(rx, ry);
+            ctx.rotate(line.angle);
+            ctx.fillRect(-line.w / 2, -line.h / 2, line.w, line.h);
+            ctx.restore();
+        });
+
+        tireTracks.forEach(t => {
+            t.alpha -= 0.0004;
+            if (t.alpha > 0) {
+                ctx.fillStyle = `rgba(10, 12, 15, ${t.alpha})`;
+                ctx.fillRect(t.x1 - car.x, t.y1 - car.y, 3.5, 3.5);
+                ctx.fillRect(t.x2 - car.x, t.y2 - car.y, 3.5, 3.5);
+            }
+        });
+
+        containers.forEach(box => {
+            ctx.save();
+            ctx.translate(box.x - car.x, box.y - car.y);
+            ctx.rotate(box.angle);
+            ctx.fillStyle = 'rgba(5, 6, 8, 0.35)';
+            ctx.fillRect(-box.w / 2 + 8, -box.h / 2 + 8, box.w, box.h);
+            ctx.fillStyle = box.color;
+            ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            for (let step = -box.w / 2 + 8; step < box.w / 2; step += 12) {
+                ctx.fillRect(step, -box.h / 2 + 4, 3, box.h - 8);
+            }
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.font = 'bold 8px Share Tech Mono';
+            ctx.fillText("MRK-350-UA", -box.w / 2 + 10, 0);
+            ctx.restore();
+        });
+
+        smokeParticles.forEach(p => {
+            p.x += p.vx; p.y += p.vy; p.size += 0.55; p.alpha -= 0.012;
+            if (p.alpha > 0) {
+                ctx.fillStyle = `rgba(225, 230, 240, ${p.alpha})`;
+                ctx.beginPath(); ctx.arc(p.x - car.x, p.y - car.y, p.size, 0, Math.PI * 2); ctx.fill();
+            }
+        });
+
+        // ЭФФЕКТ МИГАНИЯ ПРИ НЕУЯЗВИМОСТИ ПОСЛЕ УДАРА
+        if (collisionCooldown === 0 || Math.floor(collisionCooldown / 4) % 2 === 0) {
+            ctx.save();
+            ctx.rotate(car.angle);
+
+            ctx.fillStyle = 'rgba(5, 6, 8, 0.45)';
+            ctx.fillRect(-15, -24, 32, 56);
+
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath();
+            ctx.moveTo(-14, 25); ctx.lineTo(-14, -22);
+            ctx.quadraticCurveTo(-14, -30, 0, -32);
+            ctx.quadraticCurveTo(14, -30, 14, -22); ctx.lineTo(14, 25);
+            ctx.closePath(); ctx.fill();
+
+            ctx.fillStyle = '#111111';
+            ctx.fillRect(-17, -12, 3, 2); ctx.fillRect(14, -12, 3, 2);
+
+            ctx.fillStyle = '#111317';
+            ctx.beginPath();
+            ctx.moveTo(-11, 12); ctx.lineTo(-11, -10); ctx.lineTo(11, -10); ctx.lineTo(11, 12);
+            ctx.closePath(); ctx.fill();
+
+            ctx.fillStyle = '#1e1e1e'; ctx.fillRect(-10, -5, 20, 14);
+
+            ctx.fillStyle = '#111111';
+            ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(-7, -18); ctx.lineTo(-3, -18); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(7, -18); ctx.lineTo(3, -18); ctx.closePath(); ctx.fill();
+            ctx.fillRect(-2, -22, 4, 2);
+
+            ctx.fillRect(-17, 25, 34, 5);
+
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(-11, -30, 4, 2); ctx.fillRect(7, -30, 4, 2);
+
+            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
+            ctx.fillRect(-11, 24, 4, 2); ctx.fillRect(7, 24, 4, 2);
+
+            ctx.fillStyle = '#0a0a0c';
+            ctx.save(); ctx.translate(-15, -16); ctx.rotate(car.steerAngle); ctx.fillRect(-3, -7, 6, 14); ctx.restore();
+            ctx.save(); ctx.translate(15, -16); ctx.rotate(car.steerAngle); ctx.fillRect(-3, -7, 6, 14); ctx.restore();
+
+            ctx.fillRect(-15, 14, 6, 14); ctx.fillRect(12, 14, 6, 14);
+
+            ctx.restore();
+        }
+        ctx.restore();
+
+        let speedometerValue = Math.round((speedScalar / car.maxSpeedPhys) * 210);
+        if (speedometerValue > 210) speedometerValue = 210;
+        if (speedometer) speedometer.innerText = speedometerValue.toString().padStart(3, '0');
+
+        if (gDot) {
+            let offsetX = Math.max(Math.min(-localVx * 4.5, 45), -45);
+            let offsetZ = Math.max(Math.min(localVy * 0.8 - 4, 45), -45);
+            gDot.style.transform = `translate(${offsetX}px, ${offsetZ}px)`;
+        }
+    }
+</script>
+</body>
+</html>

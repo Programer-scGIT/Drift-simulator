@@ -166,53 +166,79 @@
 </div>
 
 <script>
-    // ЗВУКОВОЙ ДВИЖЕК (Web Audio API)
+    // ==========================================
+    // БРУТАЛЬНЫЙ ШУМОВОЙ ДВИЖЕК (Web Audio API)
+    // ==========================================
     let audioCtx = null;
     let motorOsc = null;
     let motorGain = null;
-    let screechOsc = null;
+    let screechNoise = null; // Генератор случайного шума вместо пищащих волн
     let screechGain = null;
+    let screechFilter = null;
 
     function initAudio() {
-        if (audioCtx) return; // Если уже создан, повторно не инициализируем
-
-        // Создаем главный аудио контекст после клика пользователя
+        if (audioCtx) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // 1. НАСТРОЙКА ЗВУКА МОТОРА
+        // 1. НАСТРОЙКА ЗВУКА МОТОРА (Оставляем твой старый рокот)
         motorOsc = audioCtx.createOscillator();
         motorGain = audioCtx.createGain();
-        motorOsc.type = 'sawtooth'; // Пилообразная волна для агрессивного рыка мотора
-        motorOsc.frequency.setValueAtTime(40, audioCtx.currentTime); // Базовая частота (холостой ход)
-        motorGain.gain.setValueAtTime(0.0, audioCtx.currentTime); // Изначально молчит
-
-        // Пропускаем через фильтр, чтобы звук не резал уши и был басовитым
+        motorOsc.type = 'sawtooth';
+        motorOsc.frequency.setValueAtTime(45, audioCtx.currentTime);
+        motorGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
         let motorFilter = audioCtx.createBiquadFilter();
         motorFilter.type = 'lowpass';
         motorFilter.frequency.setValueAtTime(180, audioCtx.currentTime);
-
         motorOsc.connect(motorFilter);
         motorFilter.connect(motorGain);
         motorGain.connect(audioCtx.destination);
         motorOsc.start();
 
-        // 2. НАСТРОЙКА ВИЗГА ШИН (ДРИФТ)
-        screechOsc = audioCtx.createOscillator();
+        // 2. ГЕНЕРАЦИЯ ХРИПЛОГО ШУМА ТРЕНИЯ ШИН (БЕЗ ЖУЖЖАНИЯ)
+        let bufferSize = audioCtx.sampleRate * 2;
+        let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        let data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1; // Создаем грязный хаотичный шум
+        }
+
+        screechNoise = audioCtx.createBufferSource();
+        screechNoise.buffer = buffer;
+        screechNoise.loop = true;
+
         screechGain = audioCtx.createGain();
-        screechOsc.type = 'triangle'; // Треугольная волна для симуляции трения резины
-        screechOsc.frequency.setValueAtTime(400, audioCtx.currentTime); // Высокий писк
-        screechGain.gain.setValueAtTime(0.0, audioCtx.currentTime); // Изначально молчит
+        screechGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
 
-        // Фильтр для визга, чтобы сделать его более грязным и шуршащим
-        let screechFilter = audioCtx.createBiquadFilter();
-        screechFilter.type = 'bandpass';
-        screechFilter.frequency.setValueAtTime(800, audioCtx.currentTime);
+        // Тяжелый низкочастотный фильтр, который срезает весь писк и оставляет глухой басовый скрежет
+        screechFilter = audioCtx.createBiquadFilter();
+        screechFilter.type = 'lowpass';
+        screechFilter.frequency.setValueAtTime(320, audioCtx.currentTime); // Глухой тон трения
 
-        screechOsc.connect(screechFilter);
+        screechNoise.connect(screechFilter);
         screechFilter.connect(screechGain);
         screechGain.connect(audioCtx.destination);
-        screechOsc.start();
+        screechNoise.start();
     }
+
+    function playCrashSound() {
+        if (!audioCtx) return;
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        let filter = audioCtx.createBiquadFilter();
+        osc.type = 'sawtooth';
+        filter.type = 'lowpass';
+        osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.4);
+        filter.frequency.setValueAtTime(150, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+    }
+
 
     // ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ ВЗРЫВА / УДАРА
     function playCrashSound() {
@@ -225,12 +251,10 @@
         osc.type = 'sawtooth';
         filter.type = 'lowpass';
 
-        // Быстрое падение частоты от 120Гц до 10Гц создает плотный удар
         osc.frequency.setValueAtTime(120, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.4);
         filter.frequency.setValueAtTime(150, audioCtx.currentTime);
 
-        // Быстрое затухание громкости удара за 0.4 секунды
         gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
 
@@ -622,31 +646,33 @@
                 isDrifting = false;
             }
 
+
             // Направление движения по вектору корпуса
             let cosA = Math.cos(car.angle);
             let sinA = Math.sin(car.angle);
             let targetVx = sinA * car.speed;
             let targetVy = -cosA * car.speed;
 
-            // Расчет локальных скоростей и угла заноса (строго перед инерцией!)
-            let localVx = car.vx * Math.cos(-car.angle) - car.vy * Math.sin(-car.angle);
-            let localVy = car.vx * Math.sin(-car.angle) + car.vy * Math.cos(-car.angle);
+
+
+            let localVx = car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle);
+            let localVy = -car.vx * Math.sin(car.angle) + car.vy * Math.cos(car.angle);
             let driftSlip = Math.abs(localVx);
 
-            // Динамический расчет сцепления с дорогой
+
+
             if (isDrifting) {
                 car.vx = car.vx * 0.98 + targetVx * 0.02;
                 car.vy = car.vy * 0.98 + targetVy * 0.02;
             } else {
-                let gripFactor = 0.22;
-                if (driftSlip > 1.5) {
-                    gripFactor = 0.03; // Машина плавно доскальзывает боком
-                } else if (driftSlip > 0.6) {
-                    gripFactor = 0.08; // Сцепление постепенно возвращается
-                }
+
+                let gripFactor = 0.12;
+                if (driftSlip > 1.5) { gripFactor = 0.03; }
+                else if (driftSlip > 0.6) { gripFactor = 0.08; }
                 car.vx += (targetVx - car.vx) * gripFactor;
                 car.vy += (targetVy - car.vy) * gripFactor;
             }
+
 
             // Расчет поворота корпуса
             if (speedScalar > 0.8) {
@@ -1013,31 +1039,33 @@
             if (speedometerValue > maxHUD) speedometerValue = maxHUD;
             if (speedometer) speedometer.innerText = speedometerValue.toString().padStart(3, '0');
 
-            // --- ДОБАВЛЕНО: УПРАВЛЕНИЕ ДИНАМИКОЙ ЗВУКА МОТОРА И ШИН ---
-            if (audioCtx && motorOsc && motorGain && screechGain) {
-                // Мотор: частота растет вместе со скоростью машины (от 40Гц на холостых до 140Гц на максимуме)
-                let motorPitch = 40 + (speedScalar / car.maxSpeedPhys) * 100;
+            // --- УПРАВЛЕНИЕ ЗВУКАМИ: МОТОР, ЗАНОС И АВАРИИ ---
+            if (audioCtx && motorOsc && motorGain && screechGain && screechFilter) {
+                // 1. Мотор
+                let motorPitch = 45 + (speedScalar / car.maxSpeedPhys) * 110;
                 motorOsc.frequency.setTargetAtTime(motorPitch, audioCtx.currentTime, 0.05);
 
-                // Громкость мотора чуть выше, когда жмем газ (W)
                 let targetMotorVolume = (keys.w || keys.W || keys.ц || keys.Ц) ? 0.15 : 0.08;
-                if (speedScalar < 0.2) targetMotorVolume = 0.03; // Тихий холостой ход при остановке
+                if (speedScalar < 0.2) targetMotorVolume = 0.03;
                 motorGain.gain.setTargetAtTime(targetMotorVolume, audioCtx.currentTime, 0.1);
 
-                // Визг шин: звучит только при активном заносе и зависит от угла driftSlip
+                // 2. БРУТАЛЬНЫЙ ЗАНОС ШИН
                 if (isDrifting && speedScalar > 2.0 && driftSlip > 0.8) {
-                    // Чем глубже угол заноса, тем пронзительнее и громче визг (макс громкость 0.07, чтобы не глушила)
-                    let targetScreechVol = Math.min(0.07, (driftSlip - 0.8) * 0.04);
-                    screechGain.gain.setTargetAtTime(targetScreechVol, audioCtx.currentTime, 0.05);
+                    let targetScreechVol = Math.min(0.35, (driftSlip - 0.8) * 0.22);
+                    screechGain.gain.setTargetAtTime(targetScreechVol, audioCtx.currentTime, 0.04);
 
-                    // Слегка меняем частоту визга от вибраций асфальта
-                    let screechPitch = 380 + Math.random() * 40 + (driftSlip * 20);
-                    screechOsc.frequency.setTargetAtTime(screechPitch, audioCtx.currentTime, 0.02);
+                    let filterFreq = 260 + (driftSlip * 45);
+                    screechFilter.frequency.setTargetAtTime(filterFreq, audioCtx.currentTime, 0.03);
                 } else {
-                    // Если не дрифтуем, плавно убираем визг колес в ноль
-                    screechGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.1);
+                    // ИСПРАВЛЕНИЕ: Плавное затухание скрежета шин вместо резкого исчезновения
+                    // Число 0.15 отвечает за скорость затухания (чем больше, тем медленнее тает звук)
+                    screechGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.15);
                 }
             }
+
+
+
+
 
             // ==========================================
             // 8. КОЛЛИЗИИ С КОНТЕЙНЕРАМИ
@@ -1109,22 +1137,32 @@
         let rightTrackX = car.x + sideX * 12;
         let rightTrackY = car.y + sideY * 12;
 
-        if (isDrifting || keys[' ']) {
-            tireTracks.push({x1: leftTrackX, y1: leftTrackY, x2: rightTrackX, y2: rightTrackY, alpha: 1.0});
-            if (Math.random() < 0.4) {
-                smokeParticles.push({
-                    x: leftTrackX, y: leftTrackY,
-                    vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
-                    size: 6, alpha: 0.8
-                });
-                smokeParticles.push({
-                    x: rightTrackX, y: rightTrackY,
-                    vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
-                    size: 6, alpha: 0.8
-                });
-            }
+
+
+    if (keys[' '] && speedScalar > 2.0) {
+        tireTracks.push({x1: leftTrackX, y1: leftTrackY, x2: rightTrackX, y2: rightTrackY, alpha: 1.0});
+        if (Math.random() < 0.4) {
+            smokeParticles.push({
+                x: leftTrackX,
+                y: leftTrackY,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                size: 6,
+                alpha: 0.8
+            });
+            smokeParticles.push({
+                x: rightTrackX,
+                y: rightTrackY,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                size: 6,
+                alpha: 0.8
+            });
         }
-        if (tireTracks.length > 1500) tireTracks.shift();
+    }
+
+
+    if (tireTracks.length > 1500) tireTracks.shift();
         if (smokeParticles.length > 400) smokeParticles.shift();
 
         // ==========================================

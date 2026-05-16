@@ -166,6 +166,82 @@
 </div>
 
 <script>
+    // ЗВУКОВОЙ ДВИЖЕК (Web Audio API)
+    let audioCtx = null;
+    let motorOsc = null;
+    let motorGain = null;
+    let screechOsc = null;
+    let screechGain = null;
+
+    function initAudio() {
+        if (audioCtx) return; // Если уже создан, повторно не инициализируем
+
+        // Создаем главный аудио контекст после клика пользователя
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // 1. НАСТРОЙКА ЗВУКА МОТОРА
+        motorOsc = audioCtx.createOscillator();
+        motorGain = audioCtx.createGain();
+        motorOsc.type = 'sawtooth'; // Пилообразная волна для агрессивного рыка мотора
+        motorOsc.frequency.setValueAtTime(40, audioCtx.currentTime); // Базовая частота (холостой ход)
+        motorGain.gain.setValueAtTime(0.0, audioCtx.currentTime); // Изначально молчит
+
+        // Пропускаем через фильтр, чтобы звук не резал уши и был басовитым
+        let motorFilter = audioCtx.createBiquadFilter();
+        motorFilter.type = 'lowpass';
+        motorFilter.frequency.setValueAtTime(180, audioCtx.currentTime);
+
+        motorOsc.connect(motorFilter);
+        motorFilter.connect(motorGain);
+        motorGain.connect(audioCtx.destination);
+        motorOsc.start();
+
+        // 2. НАСТРОЙКА ВИЗГА ШИН (ДРИФТ)
+        screechOsc = audioCtx.createOscillator();
+        screechGain = audioCtx.createGain();
+        screechOsc.type = 'triangle'; // Треугольная волна для симуляции трения резины
+        screechOsc.frequency.setValueAtTime(400, audioCtx.currentTime); // Высокий писк
+        screechGain.gain.setValueAtTime(0.0, audioCtx.currentTime); // Изначально молчит
+
+        // Фильтр для визга, чтобы сделать его более грязным и шуршащим
+        let screechFilter = audioCtx.createBiquadFilter();
+        screechFilter.type = 'bandpass';
+        screechFilter.frequency.setValueAtTime(800, audioCtx.currentTime);
+
+        screechOsc.connect(screechFilter);
+        screechFilter.connect(screechGain);
+        screechGain.connect(audioCtx.destination);
+        screechOsc.start();
+    }
+
+    // ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ ВЗРЫВА / УДАРА
+    function playCrashSound() {
+        if (!audioCtx) return;
+
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        let filter = audioCtx.createBiquadFilter();
+
+        osc.type = 'sawtooth';
+        filter.type = 'lowpass';
+
+        // Быстрое падение частоты от 120Гц до 10Гц создает плотный удар
+        osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.4);
+        filter.frequency.setValueAtTime(150, audioCtx.currentTime);
+
+        // Быстрое затухание громкости удара за 0.4 секунды
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+    }
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const menu = document.getElementById('menu-container');
@@ -363,16 +439,22 @@
 
     // Слушатели кнопок
     startBtn.addEventListener('click', () => {
+        // Активируем генерацию звуков при клике на Старт
+        initAudio();
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+
         const spec = carSpecs[currentCarModel];
         car.maxSpeedPhys = spec.maxSpeedPhys;
         car.power = spec.power;
         if (speedLimitLabel) speedLimitLabel.innerText = `LIMIT SPEED: ${spec.maxSpeedHUD} KM/H`;
 
-        // --- ИСПРАВЛЕНИЕ ЧЕРНОГО ЭКРАНА: Принудительно задаем размеры Canvas перед стартом ---
+        // Принудительно задаем размеры Canvas перед стартом
         width = canvas.width = window.innerWidth;
         height = canvas.height = window.innerHeight;
 
-        // --- ИСПРАВЛЕНИЕ ЧЕРНОГО ЭКРАНА: Сброс координат машины в центр экрана ---
+        // Сброс координат машины в центр экрана
         car.x = canvas.width / 2;
         car.y = canvas.height / 2;
         car.vx = 0;
@@ -382,7 +464,7 @@
         car.steerAngle = 0;
         car.angularVelocity = 0;
         isDrifting = false;
-        collisionCooldown = 0; // Сбрасываем неуязвимость
+        collisionCooldown = 0;
 
         menu.style.opacity = '0';
         setTimeout(() => {
@@ -393,7 +475,6 @@
             driftHud.style.opacity = '1';
             scoreBoard.style.opacity = '1';
 
-            // Чтобы циклы loop не накладывались друг на друга при повторных стартах
             if (!isRunning) {
                 isRunning = true;
                 loop();
@@ -401,561 +482,969 @@
         }, 400);
     });
 
-    openShopBtn.addEventListener('click', () => { updateBalanceUI(); updateShopCardsUI(); shopContainer.style.display = 'flex'; });
-    closeShopBtn.addEventListener('click', () => { shopContainer.style.display = 'none'; updateBalanceUI(); });
-    exitToMenuBtn.addEventListener('click', () => {
-        isRunning = false; canvas.style.opacity = '0';
-        hudR.style.opacity = '0'; hudL.style.opacity = '0'; driftHud.style.opacity = '0'; scoreBoard.style.opacity = '0';
-        menu.style.display = 'flex'; setTimeout(() => { menu.style.opacity = '1'; }, 50); updateBalanceUI();
-    });
 
-    if (buyStockBtn) buyStockBtn.addEventListener('click', () => handleCarClick('stock', 0));
-    if (buyAudiBtn) buyAudiBtn.addEventListener('click', () => handleCarClick('audi', 100000));
-    if (buyLamboBtn) buyLamboBtn.addEventListener('click', () => handleCarClick('lambo', 200000));
-    if (buyKoenigBtn) buyKoenigBtn.addEventListener('click', () => handleCarClick('koenig', 600000));
+    openShopBtn.addEventListener('click', () => {
+            updateBalanceUI();
+            updateShopCardsUI();
+            shopContainer.style.display = 'flex';
+        });
+        closeShopBtn.addEventListener('click', () => {
+            shopContainer.style.display = 'none';
+            updateBalanceUI();
+        });
+        exitToMenuBtn.addEventListener('click', () => {
+            if (motorGain) motorGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            if (screechGain) screechGain.gain.setValueAtTime(0, audioCtx.currentTime);
 
-    window.addEventListener('resize', () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; });
+            isRunning = false;
+            canvas.style.opacity = '0';
+            hudR.style.opacity = '0';
+            hudL.style.opacity = '0';
+            driftHud.style.opacity = '0';
+            scoreBoard.style.opacity = '0';
+            menu.style.display = 'flex';
+            setTimeout(() => {
+                menu.style.opacity = '1';
+            }, 50);
+            updateBalanceUI();
+        });
 
-    function checkCarCollisionWithContainer(box) {
-        let boxAngle = box.angle || 0;
+        if (buyStockBtn) buyStockBtn.addEventListener('click', () => handleCarClick('stock', 0));
+        if (buyAudiBtn) buyAudiBtn.addEventListener('click', () => handleCarClick('audi', 100000));
+        if (buyLamboBtn) buyLamboBtn.addEventListener('click', () => handleCarClick('lambo', 200000));
+        if (buyKoenigBtn) buyKoenigBtn.addEventListener('click', () => handleCarClick('koenig', 600000));
 
-        let cx = box.x - car.x;
-        let cy = box.y - car.y;
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
 
-        let s = Math.sin(-boxAngle);
-        let c = Math.cos(-boxAngle);
+        function checkCarCollisionWithContainer(box) {
+            let boxAngle = box.angle || 0;
 
-        let rx = cx * c - cy * s;
-        let ry = cx * s + cy * c;
+            // Сдвиг центра хитбокса, чтобы он идеально сидел на визуальной модели
+            let carOffsetH = 0;
+            if (currentCarModel === 'stock') carOffsetH = -3.5;
+            if (currentCarModel === 'audi') carOffsetH = 0;
+            if (currentCarModel === 'lambo') carOffsetH = 0;
+            if (currentCarModel === 'koenig') carOffsetH = -7;
 
-        let carW = 14;
-        let carH = 25;
-        if (typeof currentCarModel !== 'undefined') {
-            if (currentCarModel === 'audi') { carW = 16; carH = 33; }
-            if (currentCarModel === 'lambo') { carW = 18; carH = 30; }
-            if (currentCarModel === 'koenig') { carW = 15; carH = 34; }
-        }
+            let carCenterX = car.x + Math.sin(car.angle) * carOffsetH;
+            let carCenterY = car.y - Math.cos(car.angle) * carOffsetH;
 
-        let boxW = Math.abs(box.w || box.width || 50);
-        let boxH = Math.abs(box.h || box.height || 50);
+            let cx = box.x - carCenterX;
+            let cy = box.y - carCenterY;
 
-        return (Math.abs(rx) < (boxW / 2 + carW / 2) && Math.abs(ry) < (boxH / 2 + carH / 2));
-    }
+            let s = Math.sin(-boxAngle);
+            let c = Math.cos(-boxAngle);
 
+            let rx = cx * c - cy * s;
+            let ry = cx * s + cy * c;
 
-    // ГЛАВНЫЙ ИГРОВОЙ ЦИКЛ
-    function loop() {
-        if (!isRunning) return;
-        requestAnimationFrame(loop);
+            // Задаем реальную ширину и высоту из твоих функций отрисовки кузова
+            let carW = 28; // Сток: от -14 до 14 = 28 пикселей
+            let carH = 57; // Сток: от -32 до 25 = 57 пикселей
 
-        // ==========================================
-        // 1. ОЧИСТКА ЭКРАНА
-        // ==========================================
-        if (typeof ctx !== 'undefined' && typeof canvas !== 'undefined') {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        } else {
-            console.error("Критическая ошибка: ctx или canvas не определены в глобальной области видимости!");
-            return;
-        }
-
-        // Отрисовка бэкграунда (если функция раскомментирована, убедитесь, что она существует)
-        // drawBackground();
-
-        // ==========================================
-        // 2. ФИЗИКА И НАПРАВЛЕНИЕ ДВИЖЕНИЯ
-        // ==========================================
-        // Проверка на существование объекта car, чтобы избежать падения скрипта
-        if (!car) {
-            console.error("Объект 'car' не инициализирован!");
-            return;
-        }
-
-        let speedScalar = Math.sqrt((car.vx * car.vx) + (car.vy * car.vy)) || 0;
-
-        // Обработка руля (A / D + русская раскладка)
-        let steerInput = 0;
-        if (keys.a || keys.A || keys.ф || keys.Ф) steerInput = -1;
-        if (keys.d || keys.D || keys.в || keys.В) steerInput = 1;
-
-        if (steerInput !== 0) {
-            car.steerAngle = Math.max(Math.min(car.steerAngle + steerInput * 0.05, car.maxSteer), -car.maxSteer);
-        } else {
-            car.steerAngle *= 0.70;
-        }
-
-        // Обработка газа и тормоза (W / S + русская раскладка)
-        if (keys.w || keys.W || keys.ц || keys.Ц) car.speed = Math.min(car.speed + car.power, car.maxSpeedPhys);
-        if (keys.s || keys.S || keys.ы || keys.Ы) car.speed = Math.max(car.speed - car.brake, -car.maxSpeedPhys / 3);
-        if (!keys.w && !keys.s && !keys.W && !keys.S) car.speed *= 0.97;
-
-        // Включение и выключение дрифта
-        if (keys[' '] && speedScalar > 2.0) {
-            isDrifting = true;
-        } else {
-            isDrifting = false;
-        }
-
-        // Направление движения
-        let cosA = Math.cos(car.angle);
-        let sinA = Math.sin(car.angle);
-        let targetVx = sinA * car.speed;
-        let targetVy = -cosA * car.speed;
-
-        // Плавное скольжение
-        if (isDrifting) {
-            car.vx = car.vx * 0.98 + targetVx * 0.02;
-            car.vy = car.vy * 0.98 + targetVy * 0.02;
-        } else {
-            let gripFactor = 0.12;
-            car.vx += (targetVx - car.vx) * gripFactor;
-            car.vy += (targetVy - car.vy) * gripFactor;
-        }
-
-        // Локальные скорости машины
-        let localVx = car.vx * Math.cos(-car.angle) - car.vy * Math.sin(-car.angle);
-        let localVy = car.vx * Math.sin(-car.angle) + car.vy * Math.cos(-car.angle);
-
-        // Угловой поворот
-        if (speedScalar > 0.8) {
-            if (isDrifting) {
-                car.angularVelocity += car.steerAngle * localVy * 0.0007 - localVx * 0.0008;
-            } else {
-                car.angularVelocity = car.steerAngle * car.speed * 0.0035;
+            if (currentCarModel === 'audi') {
+                carW = 32;
+                carH = 66;
             }
+            if (currentCarModel === 'lambo') {
+                carW = 36;
+                carH = 66;
+            }
+            if (currentCarModel === 'koenig') {
+                carW = 30;
+                carH = 68;
+            }
+
+            let halfBoxW = Math.abs(box.w || 120) / 2;
+            let halfBoxH = Math.abs(box.h || 50) / 2;
+            let halfCarW = carW / 2;
+            let halfCarH = carH / 2;
+
+            let overlapX = (halfBoxW + halfCarW) - Math.abs(rx);
+            let overlapY = (halfBoxH + halfCarH) - Math.abs(ry);
+
+            if (overlapX > 0 && overlapY > 0) {
+                if (overlapX < overlapY) {
+                    let pushX = overlapX * Math.sign(rx) * -1;
+                    car.x += pushX * c;
+                    car.y += pushX * -s;
+                    car.vx *= -0.4;
+                } else {
+                    let pushY = overlapY * Math.sign(ry) * -1;
+                    car.x += pushY * s;
+                    car.y += pushY * c;
+                    car.vy *= -0.4;
+                }
+                car.speed *= -0.3;
+                return true;
+            }
+            return false;
         }
 
-        car.angularVelocity *= isDrifting ? 0.84 : 0.72;
-        car.angle += car.angularVelocity;
 
-        // Обновление позиций (Защита от NaN)
-        car.x = (car.x + car.vx) || canvas.width / 2;
-        car.y = (car.y + car.vy) || canvas.height / 2;
+        function loop() {
+            if (!isRunning) return;
+            requestAnimationFrame(loop);
 
-        // ==========================================
-        // 3. ОТРИСОВКА ОБЪЕКТОВ
-        // ==========================================
-        if (typeof containers !== 'undefined' && Array.isArray(containers)) {
-            for (let i = 0; i < containers.length; i++) {
-                if (typeof drawContainer === 'function') {
-                    drawContainer(containers[i]);
+            // ==========================================
+            // 1. ОЧИСТКА ЭКРАНА
+            // ==========================================
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // ==========================================
+            // 2. ФИЗИКА, РУЛЬ И ПЕДАЛИ
+            // ==========================================
+            let speedScalar = Math.sqrt((car.vx * car.vx) + (car.vy * car.vy)) || 0;
+
+            // Обработка руля (A / D + русская раскладка)
+            let steerInput = 0;
+            if (keys.a || keys.A || keys.ф || keys.Ф) steerInput = -1;
+            if (keys.d || keys.D || keys.в || keys.В) steerInput = 1;
+
+            if (steerInput !== 0) {
+                car.steerAngle = Math.max(Math.min(car.steerAngle + steerInput * 0.05, car.maxSteer), -car.maxSteer);
+            } else {
+                car.steerAngle *= 0.70; // Возврат руля в центр
+            }
+
+            // Обработка газа и тормоза (W / S + русская раскладка)
+            if (keys.w || keys.W || keys.ц || keys.Ц) car.speed = Math.min(car.speed + car.power, car.maxSpeedPhys);
+            if (keys.s || keys.S || keys.ы || keys.Ы) car.speed = Math.max(car.speed - car.brake, -car.maxSpeedPhys / 3);
+            if (!keys.w && !keys.s && !keys.W && !keys.S) car.speed *= 0.97; // Инерция мотора
+
+            // Включение дрифта СТРОГО на Пробел
+            if (keys[' '] && speedScalar > 2.0) {
+                isDrifting = true;
+            } else {
+                isDrifting = false;
+            }
+
+            // Направление движения по вектору корпуса
+            let cosA = Math.cos(car.angle);
+            let sinA = Math.sin(car.angle);
+            let targetVx = sinA * car.speed;
+            let targetVy = -cosA * car.speed;
+
+            // Расчет локальных скоростей и угла заноса (строго перед инерцией!)
+            let localVx = car.vx * Math.cos(-car.angle) - car.vy * Math.sin(-car.angle);
+            let localVy = car.vx * Math.sin(-car.angle) + car.vy * Math.cos(-car.angle);
+            let driftSlip = Math.abs(localVx);
+
+            // Динамический расчет сцепления с дорогой
+            if (isDrifting) {
+                car.vx = car.vx * 0.98 + targetVx * 0.02;
+                car.vy = car.vy * 0.98 + targetVy * 0.02;
+            } else {
+                let gripFactor = 0.22;
+                if (driftSlip > 1.5) {
+                    gripFactor = 0.03; // Машина плавно доскальзывает боком
+                } else if (driftSlip > 0.6) {
+                    gripFactor = 0.08; // Сцепление постепенно возвращается
+                }
+                car.vx += (targetVx - car.vx) * gripFactor;
+                car.vy += (targetVy - car.vy) * gripFactor;
+            }
+
+            // Расчет поворота корпуса
+            if (speedScalar > 0.8) {
+                if (isDrifting) {
+                    car.angularVelocity += car.steerAngle * localVy * 0.0006 - localVx * 0.0007;
+                } else {
+                    car.angularVelocity = car.steerAngle * car.speed * 0.004;
                 }
             }
-        }
 
-        if (typeof drawCar === 'function') {
-            drawCar();
-        } else {
-            console.warn("Функция drawCar() не найдена. На холсте некому рисовать машину.");
-        }
+            // Затухание вращения (0.68 позволяет машине мягко выходить из заноса)
+            car.angularVelocity *= isDrifting ? 0.82 : 0.68;
+            car.angle += car.angularVelocity;
 
-        // ==========================================
-        // 4. КОЛЛИЗИИ И СТОЛКНОВЕНИЯ
-        // ==========================================
-        if (collisionCooldown > 0) {
-            collisionCooldown--;
-        }
+            // Перемещение
+            car.x = (car.x + car.vx) || canvas.width / 2;
+            car.y = (car.y + car.vy) || canvas.height / 2;
 
-        if (typeof containers !== 'undefined' && Array.isArray(containers)) {
+            // ==========================================
+            // 3. ОБРАБОТКА ОЧКОВ И ТАЙМЕРОВ
+            // ==========================================
+            if (collisionTextTimer > 0) {
+                collisionTextTimer--;
+            }
+
+            if (collisionTextTimer === 0 && !isDrifting) {
+                driftScoreEl.style.color = "#ffffff";
+                driftScoreEl.innerText = "DRIVE AND DRIFT";
+            }
+
+            if (isDrifting && speedScalar > 2.0 && driftSlip > 0.8) {
+                if (collisionTextTimer === 0) {
+                    currentDriftScore += Math.floor(driftSlip * 15 * driftMultiplier);
+                    driftMultiplier = Math.min(driftMultiplier + 0.006, 5.0);
+                    driftScoreEl.innerText = currentDriftScore.toString();
+                    driftMultEl.style.visibility = 'visible';
+                    driftMultEl.innerText = `x${driftMultiplier.toFixed(1)} ASPHALT COMBO`;
+                    driftScoreEl.style.color = "#ffcc00";
+                }
+            } else {
+                if (currentDriftScore > 0 && collisionTextTimer === 0) {
+                    totalPoints += currentDriftScore;
+                    currentDriftScore = 0;
+                    driftMultiplier = 1.0;
+                    totalScoreVal.innerText = totalPoints.toString().padStart(6, '0');
+                }
+            }
+
+            // ==========================================
+            // 4. СЛЕДЫ ШИН И ДЫМ
+            // ==========================================
+            let sideX = Math.cos(car.angle);
+            let sideY = Math.sin(car.angle);
+            let leftTrackX = car.x - sideX * 12;
+            let leftTrackY = car.y - sideY * 12;
+            let rightTrackX = car.x + sideX * 12;
+            let rightTrackY = car.y + sideY * 12;
+
+            if (isDrifting || (speedScalar > 4 && driftSlip > 2.0)) {
+                tireTracks.push({x1: leftTrackX, y1: leftTrackY, x2: rightTrackX, y2: rightTrackY, alpha: 1.0});
+                if (Math.random() < 0.4) {
+                    smokeParticles.push({
+                        x: leftTrackX,
+                        y: leftTrackY,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        size: 6,
+                        alpha: 0.8
+                    });
+                    smokeParticles.push({
+                        x: rightTrackX,
+                        y: rightTrackY,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        size: 6,
+                        alpha: 0.8
+                    });
+                }
+            }
+            if (tireTracks.length > 1500) tireTracks.shift();
+            if (smokeParticles.length > 400) smokeParticles.shift();
+
+            // ==========================================
+            // 5. РЕНДЕРИНГ МИРА И ДЕКОРАЦИЙ
+            // ==========================================
+            let shakeIntensity = (isDrifting && driftSlip > 1.8) ? (Math.random() - 0.5) * (driftSlip * 1.2) : 0;
+            ctx.save();
+            ctx.translate(width / 2 + shakeIntensity, height / 2 + shakeIntensity);
+
+            ctx.fillStyle = '#1c1f26';
+            ctx.fillRect(-width, -height, width * 2, height * 2);
+
+            roadLines.forEach(line => {
+                ctx.save();
+                let rx = ((line.x - car.x) % 2500 + 2500) % 2500 - 1250;
+                let ry = ((line.y - car.y) % 2500 + 2500) % 2500 - 1250;
+                ctx.translate(rx, ry);
+                ctx.rotate(line.angle);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.fillRect(-line.w / 2, -line.h / 2, line.w, line.h);
+                ctx.restore();
+            });
+
+            tireTracks.forEach(t => {
+                t.alpha -= 0.0004;
+                if (t.alpha > 0) {
+                    ctx.fillStyle = `rgba(10, 12, 15, ${t.alpha})`;
+                    ctx.fillRect(t.x1 - car.x, t.y1 - car.y, 3.5, 3.5);
+                    ctx.fillRect(t.x2 - car.x, t.y2 - car.y, 3.5, 3.5);
+                }
+            });
+
+            containers.forEach(box => {
+                ctx.save();
+                ctx.translate(box.x - car.x, box.y - car.y);
+                ctx.rotate(box.angle);
+                ctx.fillStyle = 'rgba(5, 6, 8, 0.35)';
+                ctx.fillRect(-box.w / 2 + 8, -box.h / 2 + 8, box.w, box.h);
+                ctx.fillStyle = box.color;
+                ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                for (let step = -box.w / 2 + 8; step < box.w / 2; step += 12) {
+                    ctx.fillRect(step, -box.h / 2 + 4, 3, box.h - 8);
+                }
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.font = 'bold 8px Share Tech Mono';
+                ctx.fillText("MRK-350-UA", -box.w / 2 + 10, 0);
+                ctx.restore();
+            });
+
+            smokeParticles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.size += 0.55;
+                p.alpha -= 0.012;
+                if (p.alpha > 0) {
+                    ctx.fillStyle = `rgba(225, 230, 240, ${p.alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(p.x - car.x, p.y - car.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // ==========================================
+            // 6. ОТРИСОВКА КУЗОВА И КОЛЕС МАШИНЫ
+            // ==========================================
+            if (collisionCooldown === 0 || Math.floor(collisionCooldown / 4) % 2 === 0) {
+                ctx.save();
+                ctx.rotate(car.angle);
+
+                let currentW = 14;
+                let currentH = 25;
+                if (currentCarModel === 'audi') {
+                    currentW = 16;
+                    currentH = 33;
+                }
+                if (currentCarModel === 'lambo') {
+                    currentW = 18;
+                    currentH = 30;
+                }
+                if (currentCarModel === 'koenig') {
+                    currentW = 15;
+                    currentH = 34;
+                }
+
+                ctx.fillStyle = 'rgba(5, 6, 8, 0.45)';
+                ctx.fillRect(-currentW - 1, -currentH + 2, (currentW * 2) + 2, (currentH * 2) + 4);
+
+                ctx.fillStyle = carSpecs[currentCarModel].color;
+                ctx.beginPath();
+
+                if (currentCarModel === 'stock') {
+                    ctx.moveTo(-14, 25);
+                    ctx.lineTo(-14, -22);
+                    ctx.quadraticCurveTo(-14, -30, 0, -32);
+                    ctx.quadraticCurveTo(14, -30, 14, -22);
+                    ctx.lineTo(14, 25);
+                } else if (currentCarModel === 'audi') {
+                    ctx.moveTo(-currentW, currentH);
+                    ctx.lineTo(-currentW, -currentH + 10);
+                    ctx.lineTo(-currentW + 4, -currentH);
+                    ctx.lineTo(currentW - 4, -currentH);
+                    ctx.lineTo(currentW, -currentH + 10);
+                    ctx.lineTo(currentW, currentH);
+                } else if (currentCarModel === 'lambo') {
+                    ctx.moveTo(-18 + 2, currentH);
+                    ctx.lineTo(-18, -currentH + 14);
+                    ctx.lineTo(-18 + 4, -currentH);
+                    ctx.lineTo(0, -currentH - 3);
+                    ctx.lineTo(18 - 4, -currentH);
+                    ctx.lineTo(18, -currentH + 14);
+                    ctx.lineTo(18 - 2, currentH);
+                } else if (currentCarModel === 'koenig') {
+                    ctx.moveTo(-currentW, currentH);
+                    ctx.lineTo(-currentW, -currentH + 14);
+                    ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH);
+                    ctx.quadraticCurveTo(currentW, -currentH, currentW, -currentH + 14);
+                    ctx.lineTo(currentW, currentH);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#111111';
+                ctx.fillRect(-currentW, -12, 1, 2);
+                ctx.fillRect(currentW - 1, -12, 1, 2);
+
+                ctx.fillStyle = '#111317';
+                ctx.beginPath();
+                if (currentCarModel === 'koenig') {
+                    ctx.moveTo(-11, 14);
+                    ctx.quadraticCurveTo(-12, -12, 0, -14);
+                    ctx.quadraticCurveTo(12, -12, 11, 14);
+                } else if (currentCarModel === 'lambo') {
+                    ctx.moveTo(-13, 14);
+                    ctx.lineTo(-10, -19);
+                    ctx.lineTo(10, -19);
+                    ctx.lineTo(13, 14);
+                } else if (currentCarModel === 'audi') {
+                    ctx.moveTo(-13, -2);
+                    ctx.quadraticCurveTo(-11, -14, 0, -15);
+                    ctx.quadraticCurveTo(11, -14, 13, -2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#16181d';
+                    ctx.fillRect(-11, -2, 22, 18);
+                    ctx.fillStyle = '#96634e';
+                    ctx.fillRect(-9, 5, 7, 9);
+                    ctx.fillRect(2, 5, 7, 9);
+                    ctx.fillStyle = '#7a4f3d';
+                    ctx.fillRect(-8, 2, 5, 3);
+                    ctx.fillRect(3, 2, 5, 3);
+                } else {
+                    ctx.moveTo(-11, 12);
+                    ctx.lineTo(-11, -10);
+                    ctx.lineTo(11, -10);
+                    ctx.lineTo(11, 12);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#1e1e1e';
+                if (currentCarModel === 'lambo') ctx.fillRect(-8, -10, 16, 14);
+                else if (currentCarModel === 'koenig') ctx.fillRect(-9, -2, 18, 12);
+                else if (currentCarModel === 'stock') ctx.fillRect(-10, -5, 20, 14);
+
+                if (currentCarModel === 'audi') {
+                    ctx.fillStyle = '#1a1d22';
+                    ctx.fillRect(-currentW, 6, 2, 14);
+                    ctx.fillRect(currentW - 2, 6, 2, 14);
+                    ctx.fillStyle = '#111111';
+                    ctx.fillRect(-7, -currentH, 14, 3);
+                }
+
+                ctx.fillStyle = '#111111';
+                if (currentCarModel === 'stock') {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -28);
+                    ctx.lineTo(-7, -18);
+                    ctx.lineTo(-3, -18);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(0, -28);
+                    ctx.lineTo(7, -18);
+                    ctx.lineTo(3, -18);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillRect(-2, -22, 4, 2);
+                } else if (currentCarModel === 'koenig') {
+                    ctx.fillRect(-2, -24, 4, 10);
+                }
+
+                ctx.fillStyle = '#111111';
+                if (currentCarModel === 'lambo') {
+                    ctx.fillRect(-18, 30 - 3, 18 * 2, 4);
+                } else if (currentCarModel === 'koenig') {
+                    ctx.fillRect(-15 - 3, 34 - 3, (15 * 2) + 6, 4);
+                    ctx.fillRect(-15 - 3, 34 - 7, 2, 5);
+                    ctx.fillRect(15 + 1, 34 - 7, 2, 5);
+                } else if (currentCarModel === 'audi') {
+                    ctx.fillRect(-16 + 1, 33 - 2, (16 * 2) - 2, 2);
+                } else {
+                    ctx.fillRect(-17, 25, 34, 5);
+                }
+
+                ctx.fillStyle = '#ffffff';
+                if (currentCarModel === 'lambo') {
+                    ctx.fillRect(-18 + 2, -30 + 1, 6, 3);
+                    ctx.fillRect(18 - 8, -30 + 1, 6, 3);
+                } else if (currentCarModel === 'koenig') {
+                    ctx.fillRect(-15 + 2, -34 + 3, 2, 6);
+                    ctx.fillRect(15 - 4, -34 + 3, 2, 6);
+                } else if (currentCarModel === 'audi') {
+                    ctx.fillRect(-16 + 1, -33 + 1, 5, 2);
+                    ctx.fillRect(16 - 6, -33 + 1, 5, 2);
+                } else {
+                    ctx.fillRect(-11, -30, 4, 2);
+                    ctx.fillRect(7, -30, 4, 2);
+                }
+
+                ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
+                if (currentCarModel === 'lambo') {
+                    ctx.fillRect(-18 + 2, 30 - 1, 4, 2);
+                    ctx.fillRect(18 - 6, 30 - 1, 4, 2);
+                } else if (currentCarModel === 'koenig') {
+                    ctx.fillRect(-15 + 2, 34 - 1, 4, 2);
+                    ctx.fillRect(15 - 6, 34 - 1, 4, 2);
+                } else if (currentCarModel === 'audi') {
+                    ctx.fillRect(-16 + 1, 33 - 1, 5, 2);
+                    ctx.fillRect(16 - 6, 33 - 1, 5, 2);
+                } else {
+                    ctx.fillRect(-11, 24, 4, 2);
+                    ctx.fillRect(7, 24, 4, 2);
+                }
+
+                ctx.fillStyle = '#0a0a0c';
+                let frontY = -16;
+                let backY = 14;
+                let wheelW = 14;
+                if (currentCarModel === 'lambo') {
+                    frontY = -18;
+                    backY = 18;
+                    wheelW = 18;
+                }
+                if (currentCarModel === 'koenig') {
+                    frontY = -20;
+                    backY = 22;
+                    wheelW = 15;
+                }
+                if (currentCarModel === 'audi') {
+                    frontY = -22;
+                    backY = 21;
+                    wheelW = 16;
+                }
+
+                ctx.save();
+                ctx.translate(-wheelW, frontY);
+                ctx.rotate(car.steerAngle);
+                ctx.fillRect(-3, -6, 6, 13);
+                ctx.restore();
+                ctx.save();
+                ctx.translate(wheelW, frontY);
+                ctx.rotate(car.steerAngle);
+                ctx.fillRect(-3, -6, 6, 13);
+                ctx.restore();
+                ctx.fillRect(-wheelW - 1, backY, 6, 13);
+                ctx.fillRect(wheelW - 5, backY, 6, 13);
+
+                ctx.restore(); // Закрываем контекст машины
+            }
+            ctx.restore(); // Закрываем контекст сцены
+
+            // ==========================================
+            // 7. ОБНОВЛЕНИЕ HUD И ПЕРИФЕРИИ + ДИНАМИЧЕСКИЙ ЗВУК
+            // ==========================================
+            let gX = (car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle)) * 3.5;
+            let gY = (-car.vx * Math.sin(car.angle) + car.vy * Math.cos(car.angle)) * 3.5;
+            let gDist = Math.sqrt(gX * gX + gY * gY);
+            if (gDist > 45) { gX = (gX / gDist) * 45; gY = (gY / gDist) * 45; }
+            if (gDot) { gDot.style.transform = `translate(${gX}px, ${gY}px)`; }
+
+            let maxHUD = carSpecs[currentCarModel].maxSpeedHUD;
+            let speedometerValue = Math.round((speedScalar / car.maxSpeedPhys) * maxHUD);
+            if (speedometerValue > maxHUD) speedometerValue = maxHUD;
+            if (speedometer) speedometer.innerText = speedometerValue.toString().padStart(3, '0');
+
+            // --- ДОБАВЛЕНО: УПРАВЛЕНИЕ ДИНАМИКОЙ ЗВУКА МОТОРА И ШИН ---
+            if (audioCtx && motorOsc && motorGain && screechGain) {
+                // Мотор: частота растет вместе со скоростью машины (от 40Гц на холостых до 140Гц на максимуме)
+                let motorPitch = 40 + (speedScalar / car.maxSpeedPhys) * 100;
+                motorOsc.frequency.setTargetAtTime(motorPitch, audioCtx.currentTime, 0.05);
+
+                // Громкость мотора чуть выше, когда жмем газ (W)
+                let targetMotorVolume = (keys.w || keys.W || keys.ц || keys.Ц) ? 0.15 : 0.08;
+                if (speedScalar < 0.2) targetMotorVolume = 0.03; // Тихий холостой ход при остановке
+                motorGain.gain.setTargetAtTime(targetMotorVolume, audioCtx.currentTime, 0.1);
+
+                // Визг шин: звучит только при активном заносе и зависит от угла driftSlip
+                if (isDrifting && speedScalar > 2.0 && driftSlip > 0.8) {
+                    // Чем глубже угол заноса, тем пронзительнее и громче визг (макс громкость 0.07, чтобы не глушила)
+                    let targetScreechVol = Math.min(0.07, (driftSlip - 0.8) * 0.04);
+                    screechGain.gain.setTargetAtTime(targetScreechVol, audioCtx.currentTime, 0.05);
+
+                    // Слегка меняем частоту визга от вибраций асфальта
+                    let screechPitch = 380 + Math.random() * 40 + (driftSlip * 20);
+                    screechOsc.frequency.setTargetAtTime(screechPitch, audioCtx.currentTime, 0.02);
+                } else {
+                    // Если не дрифтуем, плавно убираем визг колес в ноль
+                    screechGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.1);
+                }
+            }
+
+            // ==========================================
+            // 8. КОЛЛИЗИИ С КОНТЕЙНЕРАМИ
+            // ==========================================
+            if (collisionCooldown > 0) {
+                collisionCooldown--;
+            }
+
             for (let i = 0; i < containers.length; i++) {
                 if (checkCarCollisionWithContainer(containers[i])) {
                     if (collisionCooldown === 0) {
+
+                        // Звук удара должен вызываться СТРОГО здесь (один раз в момент аварии)
+                        playCrashSound();
+
                         currentDriftScore = 0;
                         driftMultiplier = 1.0;
                         isDrifting = false;
 
                         totalPoints = Math.max(0, totalPoints - 100);
-
-                        if (typeof totalScoreVal !== 'undefined' && totalScoreVal) {
-                            totalScoreVal.innerText = totalPoints.toString().padStart(6, '0');
-                        }
+                        if (totalScoreVal) totalScoreVal.innerText = totalPoints.toString().padStart(6, '0');
 
                         collisionTextTimer = 60;
                         collisionCooldown = 90;
 
-                        if (typeof driftScoreEl !== 'undefined' && driftScoreEl) {
+                        if (driftScoreEl) {
                             driftScoreEl.innerText = "-100 ОЧКОВ";
                             driftScoreEl.style.color = "#ff3333";
                         }
-                        if (typeof driftMultEl !== 'undefined' && driftMultEl) {
-                            driftMultEl.style.visibility = 'hidden';
-                        }
+                        if (driftMultEl) driftMultEl.style.visibility = 'hidden';
                     }
                     break;
                 }
             }
         }
-    }
 
 
 
     if (driftSlip < 0.45 && !keys[' ']) {
-        isDrifting = false;
-    }
+            isDrifting = false;
+        }
 
-    if (collisionTextTimer > 0) {
-        collisionTextTimer--;
-    } else {
-        driftScoreEl.style.color = "#ffffff";
-        if (isDrifting && speedScalar > 2.0 && driftSlip > 0.8) {
-            currentDriftScore += Math.floor(driftSlip * 15 * driftMultiplier);
-            driftMultiplier = Math.min(driftMultiplier + 0.006, 5.0);
-            driftScoreEl.innerText = currentDriftScore.toString();
-            driftMultEl.style.visibility = 'visible';
-            driftMultEl.innerText = `x${driftMultiplier.toFixed(1)} ASPHALT COMBO`;
-            driftScoreEl.style.color = "#ffcc00";
+        if (collisionTextTimer > 0) {
+            collisionTextTimer--;
         } else {
-            if (currentDriftScore > 0) {
-                totalPoints += currentDriftScore;
-                currentDriftScore = 0;
-                driftMultiplier = 1.0;
-                totalScoreVal.innerText = totalPoints.toString().padStart(6, '0');
+            driftScoreEl.style.color = "#ffffff";
+            if (isDrifting && speedScalar > 2.0 && driftSlip > 0.8) {
+                currentDriftScore += Math.floor(driftSlip * 15 * driftMultiplier);
+                driftMultiplier = Math.min(driftMultiplier + 0.006, 5.0);
+                driftScoreEl.innerText = currentDriftScore.toString();
+                driftMultEl.style.visibility = 'visible';
+                driftMultEl.innerText = `x${driftMultiplier.toFixed(1)} ASPHALT COMBO`;
+                driftScoreEl.style.color = "#ffcc00";
+            } else {
+                if (currentDriftScore > 0) {
+                    totalPoints += currentDriftScore;
+                    currentDriftScore = 0;
+                    driftMultiplier = 1.0;
+                    totalScoreVal.innerText = totalPoints.toString().padStart(6, '0');
+                }
+            }
+        } // Закрыли блок логики очков
+
+        // Логика добавления следов шин и дыма (вынесена наружу, чтобы работать ВО ВРЕМЯ заноса)
+        let sideX = Math.cos(car.angle);
+        let sideY = Math.sin(car.angle);
+        let leftTrackX = car.x - sideX * 12;
+        let leftTrackY = car.y - sideY * 12;
+        let rightTrackX = car.x + sideX * 12;
+        let rightTrackY = car.y + sideY * 12;
+
+        if (isDrifting || keys[' ']) {
+            tireTracks.push({x1: leftTrackX, y1: leftTrackY, x2: rightTrackX, y2: rightTrackY, alpha: 1.0});
+            if (Math.random() < 0.4) {
+                smokeParticles.push({
+                    x: leftTrackX, y: leftTrackY,
+                    vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                    size: 6, alpha: 0.8
+                });
+                smokeParticles.push({
+                    x: rightTrackX, y: rightTrackY,
+                    vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                    size: 6, alpha: 0.8
+                });
             }
         }
-    } // Закрыли блок логики очков
+        if (tireTracks.length > 1500) tireTracks.shift();
+        if (smokeParticles.length > 400) smokeParticles.shift();
 
-    // Логика добавления следов шин и дыма (вынесена наружу, чтобы работать ВО ВРЕМЯ заноса)
-    let sideX = Math.cos(car.angle);
-    let sideY = Math.sin(car.angle);
-    let leftTrackX = car.x - sideX * 12;
-    let leftTrackY = car.y - sideY * 12;
-    let rightTrackX = car.x + sideX * 12;
-    let rightTrackY = car.y + sideY * 12;
-
-    if (isDrifting || keys[' ']) {
-        tireTracks.push({x1: leftTrackX, y1: leftTrackY, x2: rightTrackX, y2: rightTrackY, alpha: 1.0});
-        if (Math.random() < 0.4) {
-            smokeParticles.push({
-                x: leftTrackX, y: leftTrackY,
-                vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
-                size: 6, alpha: 0.8
-            });
-            smokeParticles.push({
-                x: rightTrackX, y: rightTrackY,
-                vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
-                size: 6, alpha: 0.8
-            });
-        }
-    }
-    if (tireTracks.length > 1500) tireTracks.shift();
-    if (smokeParticles.length > 400) smokeParticles.shift();
-
-    // ==========================================
-    // ИСПРАВЛЕНИЕ: РЕНДЕРИНГ СЦЕНЫ ТЕПЕРЬ РАБОТАЕТ ВСЕГДА
-    // ==========================================
-    let shakeIntensity = (isDrifting && driftSlip > 1.3) ? (Math.random() - 0.5) * (driftSlip * 1.3) : 0;
-    ctx.save();
-    ctx.translate(width / 2 + shakeIntensity, height / 2 + shakeIntensity);
-
-    // Отрисовка подложки асфальта
-    ctx.fillStyle = '#1c1f26';
-    ctx.fillRect(-width, -height, width * 2, height * 2);
-
-    // Разметка дорожных линий
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    roadLines.forEach(line => {
+        // ==========================================
+        // ИСПРАВЛЕНИЕ: РЕНДЕРИНГ СЦЕНЫ ТЕПЕРЬ РАБОТАЕТ ВСЕГДА
+        // ==========================================
+        let shakeIntensity = (isDrifting && driftSlip > 1.3) ? (Math.random() - 0.5) * (driftSlip * 1.3) : 0;
         ctx.save();
-        let rx = ((line.x - car.x) % 2500 + 2500) % 2500 - 1250;
-        let ry = ((line.y - car.y) % 2500 + 2500) % 2500 - 1250;
-        ctx.translate(rx, ry);
-        ctx.rotate(line.angle);
-        ctx.fillRect(-line.w / 2, -line.h / 2, line.w, line.h);
-        ctx.restore();
-    });
+        ctx.translate(width / 2 + shakeIntensity, height / 2 + shakeIntensity);
 
-    // Отрисовка следов протектора
-    tireTracks.forEach(t => {
-        t.alpha -= 0.0004;
-        if (t.alpha > 0) {
-            ctx.fillStyle = `rgba(10, 12, 15, ${t.alpha})`;
-            ctx.fillRect(t.x1 - car.x, t.y1 - car.y, 3.5, 3.5);
-            ctx.fillRect(t.x2 - car.x, t.y2 - car.y, 3.5, 3.5);
-        }
-    });
+        // Отрисовка подложки асфальта
+        ctx.fillStyle = '#1c1f26';
+        ctx.fillRect(-width, -height, width * 2, height * 2);
 
-    // Отрисовка всех контейнеров на карте с учетом сдвига камеры относительно машины
-    containers.forEach(box => {
-        ctx.save();
-        ctx.translate(box.x - car.x, box.y - car.y);
-        ctx.rotate(box.angle);
-        // Отрисовка тени контейнера
-        ctx.fillStyle = 'rgba(5, 6, 8, 0.35)';
-        ctx.fillRect(-box.w / 2 + 8, -box.h / 2 + 8, box.w, box.h);
-        // Отрисовка самого контейнера
-        ctx.fillStyle = box.color;
-        ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h);
-        // Отрисовка ребер жесткости контейнера
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-        for (let step = -box.w / 2 + 8; step < box.w / 2; step += 12) {
-            ctx.fillRect(step, -box.h / 2 + 4, 3, box.h - 8);
-        }
-        // Текст маркировки
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.font = 'bold 8px Share Tech Mono';
-        ctx.fillText("MRK-350-UA", -box.w / 2 + 10, 0);
-        ctx.restore();
-    });
+        // Разметка дорожных линий
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        roadLines.forEach(line => {
+            ctx.save();
+            let rx = ((line.x - car.x) % 2500 + 2500) % 2500 - 1250;
+            let ry = ((line.y - car.y) % 2500 + 2500) % 2500 - 1250;
+            ctx.translate(rx, ry);
+            ctx.rotate(line.angle);
+            ctx.fillRect(-line.w / 2, -line.h / 2, line.w, line.h);
+            ctx.restore();
+        });
 
-    // Расчет и отрисовка дыма из-под колес
-    smokeParticles.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.size += 0.55;
-        p.alpha -= 0.012;
-        if (p.alpha > 0) {
-            ctx.fillStyle = `rgba(225, 230, 240, ${p.alpha})`;
+        // Отрисовка следов протектора
+        tireTracks.forEach(t => {
+            t.alpha -= 0.0004;
+            if (t.alpha > 0) {
+                ctx.fillStyle = `rgba(10, 12, 15, ${t.alpha})`;
+                ctx.fillRect(t.x1 - car.x, t.y1 - car.y, 3.5, 3.5);
+                ctx.fillRect(t.x2 - car.x, t.y2 - car.y, 3.5, 3.5);
+            }
+        });
+
+        // Отрисовка всех контейнеров на карте с учетом сдвига камеры относительно машины
+        containers.forEach(box => {
+            ctx.save();
+            ctx.translate(box.x - car.x, box.y - car.y);
+            ctx.rotate(box.angle);
+            // Отрисовка тени контейнера
+            ctx.fillStyle = 'rgba(5, 6, 8, 0.35)';
+            ctx.fillRect(-box.w / 2 + 8, -box.h / 2 + 8, box.w, box.h);
+            // Отрисовка самого контейнера
+            ctx.fillStyle = box.color;
+            ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h);
+            // Отрисовка ребер жесткости контейнера
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            for (let step = -box.w / 2 + 8; step < box.w / 2; step += 12) {
+                ctx.fillRect(step, -box.h / 2 + 4, 3, box.h - 8);
+            }
+            // Текст маркировки
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.font = 'bold 8px Share Tech Mono';
+            ctx.fillText("MRK-350-UA", -box.w / 2 + 10, 0);
+            ctx.restore();
+        });
+
+        // Расчет и отрисовка дыма из-под колес
+        smokeParticles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.size += 0.55;
+            p.alpha -= 0.012;
+            if (p.alpha > 0) {
+                ctx.fillStyle = `rgba(225, 230, 240, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x - car.x, p.y - car.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+
+        // Проверка мигания машины при получении урона (эффект неуязвимости)
+        if (collisionCooldown === 0 || Math.floor(collisionCooldown / 4) % 2 === 0) {
+            ctx.save();
+            ctx.rotate(car.angle);
+
+            let currentW = 14;
+            let currentH = 25;
+            if (currentCarModel === 'audi') {
+                currentW = 16;
+                currentH = 33;
+            }
+            if (currentCarModel === 'lambo') {
+                currentW = 18;
+                currentH = 30;
+            }
+            if (currentCarModel === 'koenig') {
+                currentW = 15;
+                currentH = 34;
+            }
+
+
+            // Отрисовка тени под машиной
+            ctx.fillStyle = 'rgba(5, 6, 8, 0.45)';
+            ctx.fillRect(-currentW - 1, -currentH + 2, (currentW * 2) + 2, (currentH * 2) + 4);
+
+            // Инициализация цвета кузова из Specs
+            ctx.fillStyle = carSpecs[currentCarModel].color;
             ctx.beginPath();
-            ctx.arc(p.x - car.x, p.y - car.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    });
 
-    // Проверка мигания машины при получении урона (эффект неуязвимости)
-    if (collisionCooldown === 0 || Math.floor(collisionCooldown / 4) % 2 === 0) {
-        ctx.save();
-        ctx.rotate(car.angle);
-
-        let currentW = 14;
-        let currentH = 25;
-        if (currentCarModel === 'audi') {
-            currentW = 16;
-            currentH = 33;
-        }
-        if (currentCarModel === 'lambo') {
-            currentW = 18;
-            currentH = 30;
-        }
-        if (currentCarModel === 'koenig') {
-            currentW = 15;
-            currentH = 34;
-        }
-
-
-        // Отрисовка тени под машиной
-        ctx.fillStyle = 'rgba(5, 6, 8, 0.45)';
-        ctx.fillRect(-currentW - 1, -currentH + 2, (currentW * 2) + 2, (currentH * 2) + 4);
-
-        // Инициализация цвета кузова из Specs
-        ctx.fillStyle = carSpecs[currentCarModel].color;
-        ctx.beginPath();
-
-        if (currentCarModel === 'stock') {
-            ctx.moveTo(-14, 25);
-            ctx.lineTo(-14, -22);
-            ctx.quadraticCurveTo(-14, -30, 0, -32);
-            ctx.quadraticCurveTo(14, -30, 14, -22);
-            ctx.lineTo(14, 25);
-        } else if (currentCarModel === 'audi') {
-            ctx.moveTo(-currentW, currentH);
-            ctx.lineTo(-currentW, -currentH + 10);
-            ctx.lineTo(-currentW + 4, -currentH);
-            ctx.lineTo(currentW - 4, -currentH);
-            ctx.lineTo(currentW, -currentH + 10);
-            ctx.lineTo(currentW, currentH);
-        } else if (currentCarModel === 'lambo') {
-            ctx.moveTo(-18 + 2, currentH);
-            ctx.lineTo(-18, -currentH + 14);
-            ctx.lineTo(-18 + 4, -currentH);
-            ctx.lineTo(0, -currentH - 3);
-            ctx.lineTo(18 - 4, -currentH);
-            ctx.lineTo(18, -currentH + 14);
-            ctx.lineTo(18 - 2, currentH);
-        } else if (currentCarModel === 'koenig') {
-            ctx.moveTo(-currentW, currentH);
-            ctx.lineTo(-currentW, -currentH + 14);
-            ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH);
-            ctx.quadraticCurveTo(currentW, -currentH, currentW, -currentH + 14);
-            ctx.lineTo(currentW, currentH);
-        }
-        ctx.closePath();
-        ctx.fill();
-
-        // Отрисовка зеркал заднего вида
-        ctx.fillStyle = '#111111';
-        ctx.fillRect(-currentW, -12, 1, 2);
-        ctx.fillRect(currentW - 1, -12, 1, 2);
-
-        // Стёкла, фары и детализация интерьера салона
-        ctx.fillStyle = '#111317';
-        ctx.beginPath();
-        if (currentCarModel === 'koenig') {
-            ctx.moveTo(-11, 14);
-            ctx.quadraticCurveTo(-12, -12, 0, -14);
-            ctx.quadraticCurveTo(12, -12, 11, 14);
-            ctx.closePath();
-            ctx.fill();
-        } else if (currentCarModel === 'lambo') {
-            ctx.moveTo(-13, 14);
-            ctx.lineTo(-10, -19);
-            ctx.lineTo(10, -19);
-            ctx.lineTo(13, 14);
-            ctx.closePath();
-            ctx.fill();
-        } else if (currentCarModel === 'audi') {
-            ctx.moveTo(-13, -2);
-            ctx.quadraticCurveTo(-11, -14, 0, -15);
-            ctx.quadraticCurveTo(11, -14, 13, -2);
+            if (currentCarModel === 'stock') {
+                ctx.moveTo(-14, 25);
+                ctx.lineTo(-14, -22);
+                ctx.quadraticCurveTo(-14, -30, 0, -32);
+                ctx.quadraticCurveTo(14, -30, 14, -22);
+                ctx.lineTo(14, 25);
+            } else if (currentCarModel === 'audi') {
+                ctx.moveTo(-currentW, currentH);
+                ctx.lineTo(-currentW, -currentH + 10);
+                ctx.lineTo(-currentW + 4, -currentH);
+                ctx.lineTo(currentW - 4, -currentH);
+                ctx.lineTo(currentW, -currentH + 10);
+                ctx.lineTo(currentW, currentH);
+            } else if (currentCarModel === 'lambo') {
+                ctx.moveTo(-18 + 2, currentH);
+                ctx.lineTo(-18, -currentH + 14);
+                ctx.lineTo(-18 + 4, -currentH);
+                ctx.lineTo(0, -currentH - 3);
+                ctx.lineTo(18 - 4, -currentH);
+                ctx.lineTo(18, -currentH + 14);
+                ctx.lineTo(18 - 2, currentH);
+            } else if (currentCarModel === 'koenig') {
+                ctx.moveTo(-currentW, currentH);
+                ctx.lineTo(-currentW, -currentH + 14);
+                ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH);
+                ctx.quadraticCurveTo(currentW, -currentH, currentW, -currentH + 14);
+                ctx.lineTo(currentW, currentH);
+            }
             ctx.closePath();
             ctx.fill();
 
-            // Прорисовка кокпита для Audi R8 Spyder
-            ctx.fillStyle = '#16181d';
-            ctx.fillRect(-11, -2, 22, 18);
-            ctx.fillStyle = '#96634e';
-            ctx.fillRect(-9, 5, 7, 9);
-            ctx.fillRect(2, 5, 7, 9); // Кожаные кресла
-            ctx.fillStyle = '#7a4f3d';
-            ctx.fillRect(-8, 2, 5, 3);
-            ctx.fillRect(3, 2, 5, 3); // Подголовники сидений
-        } else {
-            // Дефолтное остекление кузова для BMW M8 Stock
-            ctx.moveTo(-11, 12);
-            ctx.lineTo(-11, -10);
-            ctx.lineTo(11, -10);
-            ctx.lineTo(11, 12);
-            ctx.closePath();
-            ctx.fill();
-        }
-
-
-        ctx.fillStyle = '#1e1e1e';
-        if (currentCarModel === 'lambo') ctx.fillRect(-8, -10, 16, 14);
-        else if (currentCarModel === 'koenig') ctx.fillRect(-9, -2, 18, 12);
-        else if (currentCarModel === 'stock') ctx.fillRect(-10, -5, 20, 14);
-
-        if (currentCarModel === 'audi') {
-            ctx.fillStyle = '#1a1d22';
-            ctx.fillRect(-currentW, 6, 2, 14);
-            ctx.fillRect(currentW - 2, 6, 2, 14);
+            // Отрисовка зеркал заднего вида
             ctx.fillStyle = '#111111';
-            ctx.fillRect(-7, -currentH, 14, 3);
-        }
+            ctx.fillRect(-currentW, -12, 1, 2);
+            ctx.fillRect(currentW - 1, -12, 1, 2);
 
-        ctx.fillStyle = '#111111';
-        if (currentCarModel === 'stock') {
+            // Стёкла, фары и детализация интерьера салона
+            ctx.fillStyle = '#111317';
             ctx.beginPath();
-            ctx.moveTo(0, -28);
-            ctx.lineTo(-7, -18);
-            ctx.lineTo(-3, -18);
-            ctx.closePath();
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(0, -28);
-            ctx.lineTo(7, -18);
-            ctx.lineTo(3, -18);
-            ctx.closePath();
-            ctx.fill();
-            ctx.fillRect(-2, -22, 4, 2);
-        } else if (currentCarModel === 'koenig') {
-            ctx.fillRect(-2, -24, 4, 10);
+            if (currentCarModel === 'koenig') {
+                ctx.moveTo(-11, 14);
+                ctx.quadraticCurveTo(-12, -12, 0, -14);
+                ctx.quadraticCurveTo(12, -12, 11, 14);
+                ctx.closePath();
+                ctx.fill();
+            } else if (currentCarModel === 'lambo') {
+                ctx.moveTo(-13, 14);
+                ctx.lineTo(-10, -19);
+                ctx.lineTo(10, -19);
+                ctx.lineTo(13, 14);
+                ctx.closePath();
+                ctx.fill();
+            } else if (currentCarModel === 'audi') {
+                ctx.moveTo(-13, -2);
+                ctx.quadraticCurveTo(-11, -14, 0, -15);
+                ctx.quadraticCurveTo(11, -14, 13, -2);
+                ctx.closePath();
+                ctx.fill();
+
+                // Прорисовка кокпита для Audi R8 Spyder
+                ctx.fillStyle = '#16181d';
+                ctx.fillRect(-11, -2, 22, 18);
+                ctx.fillStyle = '#96634e';
+                ctx.fillRect(-9, 5, 7, 9);
+                ctx.fillRect(2, 5, 7, 9); // Кожаные кресла
+                ctx.fillStyle = '#7a4f3d';
+                ctx.fillRect(-8, 2, 5, 3);
+                ctx.fillRect(3, 2, 5, 3); // Подголовники сидений
+            } else {
+                // Дефолтное остекление кузова для BMW M8 Stock
+                ctx.moveTo(-11, 12);
+                ctx.lineTo(-11, -10);
+                ctx.lineTo(11, -10);
+                ctx.lineTo(11, 12);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+
+            ctx.fillStyle = '#1e1e1e';
+            if (currentCarModel === 'lambo') ctx.fillRect(-8, -10, 16, 14);
+            else if (currentCarModel === 'koenig') ctx.fillRect(-9, -2, 18, 12);
+            else if (currentCarModel === 'stock') ctx.fillRect(-10, -5, 20, 14);
+
+            if (currentCarModel === 'audi') {
+                ctx.fillStyle = '#1a1d22';
+                ctx.fillRect(-currentW, 6, 2, 14);
+                ctx.fillRect(currentW - 2, 6, 2, 14);
+                ctx.fillStyle = '#111111';
+                ctx.fillRect(-7, -currentH, 14, 3);
+            }
+
+            ctx.fillStyle = '#111111';
+            if (currentCarModel === 'stock') {
+                ctx.beginPath();
+                ctx.moveTo(0, -28);
+                ctx.lineTo(-7, -18);
+                ctx.lineTo(-3, -18);
+                ctx.closePath();
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(0, -28);
+                ctx.lineTo(7, -18);
+                ctx.lineTo(3, -18);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillRect(-2, -22, 4, 2);
+            } else if (currentCarModel === 'koenig') {
+                ctx.fillRect(-2, -24, 4, 10);
+            }
+
+            // Спойлеры
+            ctx.fillStyle = '#111111';
+            if (currentCarModel === 'lambo') {
+                ctx.fillRect(-18, 30 - 3, 18 * 2, 4);
+            } else if (currentCarModel === 'koenig') {
+                ctx.fillRect(-15 - 3, 34 - 3, (15 * 2) + 6, 4);
+                ctx.fillRect(-15 - 3, 34 - 7, 2, 5);
+                ctx.fillRect(15 + 1, 34 - 7, 2, 5);
+            } else if (currentCarModel === 'audi') {
+                ctx.fillRect(-16 + 1, 33 - 2, (16 * 2) - 2, 2);
+            } else {
+                ctx.fillRect(-17, 25, 34, 5);
+            }
+
+            // Фары передние
+            ctx.fillStyle = '#ffffff';
+            if (currentCarModel === 'lambo') {
+                ctx.fillRect(-18 + 2, -30 + 1, 6, 3);
+                ctx.fillRect(18 - 8, -30 + 1, 6, 3);
+            } else if (currentCarModel === 'koenig') {
+                ctx.fillRect(-15 + 2, -34 + 3, 2, 6);
+                ctx.fillRect(15 - 4, -34 + 3, 2, 6);
+            } else if (currentCarModel === 'audi') {
+                ctx.fillRect(-16 + 1, -33 + 1, 5, 2);
+                ctx.fillRect(16 - 6, -33 + 1, 5, 2);
+            } else {
+                ctx.fillRect(-11, -30, 4, 2);
+                ctx.fillRect(7, -30, 4, 2);
+            }
+
+            // Стопы задние
+            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
+            if (currentCarModel === 'lambo') {
+                ctx.fillRect(-18 + 2, 30 - 1, 4, 2);
+                ctx.fillRect(18 - 6, 30 - 1, 4, 2);
+            } else if (currentCarModel === 'koenig') {
+                ctx.fillRect(-15 + 2, 34 - 1, 4, 2);
+                ctx.fillRect(15 - 6, 34 - 1, 4, 2);
+            } else if (currentCarModel === 'audi') {
+                ctx.fillRect(-16 + 1, 33 - 1, 5, 2);
+                ctx.fillRect(16 - 6, 33 - 1, 5, 2);
+            } else {
+                ctx.fillRect(-11, 24, 4, 2);
+                ctx.fillRect(7, 24, 4, 2);
+            }
+            // Колёса
+            ctx.fillStyle = '#0a0a0c';
+            let frontY = -16;
+            let backY = 14;
+            let wheelW = 14;
+            if (currentCarModel === 'lambo') {
+                frontY = -18;
+                backY = 18;
+                wheelW = 18;
+            }
+            if (currentCarModel === 'koenig') {
+                frontY = -20;
+                backY = 22;
+                wheelW = 15;
+            }
+            if (currentCarModel === 'audi') {
+                frontY = -22;
+                backY = 21;
+                wheelW = 16;
+            }
+
+            // Переднее левое колесо (с поворотом)
+            ctx.save();
+            ctx.translate(-wheelW, frontY);
+            ctx.rotate(car.steerAngle);
+            ctx.fillRect(-3, -6, 6, 13);
+            ctx.restore();
+
+            // Переднее правое колесо (с поворотом)
+            ctx.save();
+            ctx.translate(wheelW, frontY);
+            ctx.rotate(car.steerAngle);
+            ctx.fillRect(-3, -6, 6, 13);
+            ctx.restore();
+
+            // Задние колёса (фиксированные)
+            ctx.fillRect(-wheelW - 1, backY, 6, 13);
+            ctx.fillRect(wheelW - 5, backY, 6, 13);
+
+            ctx.restore(); // Закрываем поворот и координаты машины
+        }
+        ctx.restore(); // Закрываем глобальный сдвиг камеры сцены
+
+        // G-Force HUD шарик
+        let gX = (car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle)) * 3.5;
+        let gY = (-car.vx * Math.sin(car.angle) + car.vy * Math.cos(car.angle)) * 3.5;
+        let gDist = Math.sqrt(gX * gX + gY * gY);
+        if (gDist > 45) {
+            gX = (gX / gDist) * 45;
+            gY = (gY / gDist) * 45;
+        }
+        if (gDot) {
+            gDot.style.transform = `translate(${gX}px, ${gY}px)`;
         }
 
-        // Спойлеры
-        ctx.fillStyle = '#111111';
-        if (currentCarModel === 'lambo') {
-            ctx.fillRect(-18, 30 - 3, 18 * 2, 4);
-        } else if (currentCarModel === 'koenig') {
-            ctx.fillRect(-15 - 3, 34 - 3, (15 * 2) + 6, 4);
-            ctx.fillRect(-15 - 3, 34 - 7, 2, 5);
-            ctx.fillRect(15 + 1, 34 - 7, 2, 5);
-        } else if (currentCarModel === 'audi') {
-            ctx.fillRect(-16 + 1, 33 - 2, (16 * 2) - 2, 2);
-        } else {
-            ctx.fillRect(-17, 25, 34, 5);
-        }
+        // Спидометр
+        let maxHUD = carSpecs[currentCarModel].maxSpeedHUD;
+        // Рассчитываем актуальную скорость для HUD в текущем кадре
+        let currentSpeedScalar = Math.sqrt((car.vx * car.vx) + (car.vy * car.vy)) || 0;
+        let speedometerValue = Math.round((currentSpeedScalar / car.maxSpeedPhys) * maxHUD);
+        if (speedometerValue > maxHUD) speedometerValue = maxHUD;
+        if (speedometer) speedometer.innerText = speedometerValue.toString().padStart(3, '0');
 
-        // Фары передние
-        ctx.fillStyle = '#ffffff';
-        if (currentCarModel === 'lambo') {
-            ctx.fillRect(-18 + 2, -30 + 1, 6, 3);
-            ctx.fillRect(18 - 8, -30 + 1, 6, 3);
-        } else if (currentCarModel === 'koenig') {
-            ctx.fillRect(-15 + 2, -34 + 3, 2, 6);
-            ctx.fillRect(15 - 4, -34 + 3, 2, 6);
-        } else if (currentCarModel === 'audi') {
-            ctx.fillRect(-16 + 1, -33 + 1, 5, 2);
-            ctx.fillRect(16 - 6, -33 + 1, 5, 2);
-        } else {
-            ctx.fillRect(-11, -30, 4, 2);
-            ctx.fillRect(7, -30, 4, 2);
-        }
-
-        // Стопы задние
-        ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
-        if (currentCarModel === 'lambo') {
-            ctx.fillRect(-18 + 2, 30 - 1, 4, 2);
-            ctx.fillRect(18 - 6, 30 - 1, 4, 2);
-        } else if (currentCarModel === 'koenig') {
-            ctx.fillRect(-15 + 2, 34 - 1, 4, 2);
-            ctx.fillRect(15 - 6, 34 - 1, 4, 2);
-        } else if (currentCarModel === 'audi') {
-            ctx.fillRect(-16 + 1, 33 - 1, 5, 2);
-            ctx.fillRect(16 - 6, 33 - 1, 5, 2);
-        } else {
-            ctx.fillRect(-11, 24, 4, 2);
-            ctx.fillRect(7, 24, 4, 2);
-        }
-        // Колёса
-        ctx.fillStyle = '#0a0a0c';
-        let frontY = -16;
-        let backY = 14;
-        let wheelW = 14;
-        if (currentCarModel === 'lambo') {
-            frontY = -18;
-            backY = 18;
-            wheelW = 18;
-        }
-        if (currentCarModel === 'koenig') {
-            frontY = -20;
-            backY = 22;
-            wheelW = 15;
-        }
-        if (currentCarModel === 'audi') {
-            frontY = -22;
-            backY = 21;
-            wheelW = 16;
-        }
-
-        // Переднее левое колесо (с поворотом)
-        ctx.save();
-        ctx.translate(-wheelW, frontY);
-        ctx.rotate(car.steerAngle);
-        ctx.fillRect(-3, -6, 6, 13);
-        ctx.restore();
-
-        // Переднее правое колесо (с поворотом)
-        ctx.save();
-        ctx.translate(wheelW, frontY);
-        ctx.rotate(car.steerAngle);
-        ctx.fillRect(-3, -6, 6, 13);
-        ctx.restore();
-
-        // Задние колёса (фиксированные)
-        ctx.fillRect(-wheelW - 1, backY, 6, 13);
-        ctx.fillRect(wheelW - 5, backY, 6, 13);
-
-        ctx.restore(); // Закрываем поворот и координаты машины
-    }
-    ctx.restore(); // Закрываем глобальный сдвиг камеры сцены
-
-    // G-Force HUD шарик
-    let gX = (car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle)) * 3.5;
-    let gY = (-car.vx * Math.sin(car.angle) + car.vy * Math.cos(car.angle)) * 3.5;
-    let gDist = Math.sqrt(gX * gX + gY * gY);
-    if (gDist > 45) {
-        gX = (gX / gDist) * 45;
-        gY = (gY / gDist) * 45;
-    }
-    if (gDot) {
-        gDot.style.transform = `translate(${gX}px, ${gY}px)`;
-    }
-
-    // Спидометр
-    let maxHUD = carSpecs[currentCarModel].maxSpeedHUD;
-    // Рассчитываем актуальную скорость для HUD в текущем кадре
-    let currentSpeedScalar = Math.sqrt((car.vx * car.vx) + (car.vy * car.vy)) || 0;
-    let speedometerValue = Math.round((currentSpeedScalar / car.maxSpeedPhys) * maxHUD);
-    if (speedometerValue > maxHUD) speedometerValue = maxHUD;
-    if (speedometer) speedometer.innerText = speedometerValue.toString().padStart(3, '0');
 
 </script>
 </body>

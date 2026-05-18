@@ -373,14 +373,16 @@
     const carSpecs = {
         stock:    { maxSpeedPhys: 13.12, power: 0.22, maxSpeedHUD: 210, color: '#ffcc00' },
         audi:     { maxSpeedPhys: 18.12, power: 0.29, maxSpeedHUD: 290, color: '#536271' },
-        porsche:  { maxSpeedPhys: 19.18, power: 0.30, maxSpeedHUD: 299, color: '#e60000' },
-        nissan:   { maxSpeedPhys: 19.87, power: 0.31, maxSpeedHUD: 310, color: '#ffffff' },
+        porsche:  { maxSpeedPhys: 19.18, power: 0.30, maxSpeedHUD: 299, color: '#ff3333' },
         lambo:    { maxSpeedPhys: 21.87, power: 0.35, maxSpeedHUD: 350, color: '#ff3333' },
-        corvette: { maxSpeedPhys: 22.87, power: 0.37, maxSpeedHUD: 360, color: '#ffdd00' },
-        koenig:   { maxSpeedPhys: 30.00, power: 0.50, maxSpeedHUD: 480, color: '#00e5ff' },
         mark2:    { maxSpeedPhys: 16.50, power: 0.28, maxSpeedHUD: 275, color: '#fcfcfc' },
-
+        nissan:   { maxSpeedPhys: 19.87, power: 0.31, maxSpeedHUD: 310, color: '#ffffff' },
+        corvette: { maxSpeedPhys: 22.87, power: 0.37, maxSpeedHUD: 360, color: '#ffdd00' },
+        egoista:  { maxSpeedPhys: 37.40, power: 0.65, maxSpeedHUD: 599, color: '#3a3f47' },
+        koenig:   { maxSpeedPhys: 30.00, power: 0.50, maxSpeedHUD: 480, color: '#00e5ff' },
+        ae86:     { maxSpeedPhys: 8.50,  power: 0.16, maxSpeedHUD: 108, color: '#7a828a' } // МЕНЯЕМ ЦВЕТ НА СЕРЫЙ ТУТ!
     };
+
 
 
     const carNames = {
@@ -392,6 +394,9 @@
         corvette: 'CORVETTE',
         koenig: 'KOENIGSEGG',
         mark2: 'TOYOTA MARK II',
+        egoista: 'LAMBO EGOISTA',
+        ae86: 'TOYOTA AE86 LEVIN',
+
 
     };
 
@@ -403,8 +408,12 @@
         lambo: 200000,
         nissan: 150000,
         corvette: 250000,
-        koenig: 1000000,
-        mark2: 85000,
+        koenig: 1100000,
+        mark2: 185000,
+        egoista: 2900000,
+        ae86: 20000,
+
+
 
     };
 
@@ -413,12 +422,14 @@
         audi:     { w: 16, h: 33, frontY: -22, backY: 21, wheelW: 16 },
         porsche:  { w: 15, h: 28, frontY: -18, backY: 17, wheelW: 15 },
         lambo:    { w: 18, h: 30, frontY: -18, backY: 18, wheelW: 18 },
+        mark2:    { w: 16, h: 31, frontY: -20, backY: 19, wheelW: 16 },
         nissan:   { w: 15, h: 25, frontY: -16, backY: 14, wheelW: 15 },
         corvette: { w: 16, h: 25, frontY: -16, backY: 14, wheelW: 16 },
+        egoista:  { w: 18, h: 32, frontY: -19, backY: 19, wheelW: 18 },
         koenig:   { w: 15, h: 34, frontY: -20, backY: 22, wheelW: 15 },
-        mark2: { w: 16, h: 31, frontY: -20, backY: 19, wheelW: 16 }
-
+        ae86:     { w: 10, h: 22, frontY: -10, backY: 10, wheelW: 10 },
     };
+
 
 
     // ==========================================
@@ -843,10 +854,9 @@
             ctx.lineTo(currentW, -currentH + 10);
             ctx.lineTo(currentW, currentH);
         } else if (currentCarModel === 'porsche') {
-            // ФИРМЕННЫЙ ОКРУГЛЫЙ КУЗОВ ПОРШЕ 911
-            ctx.moveTo(-currentW + 2, currentH); // Задние крылья
-            ctx.quadraticCurveTo(-currentW, 0, -currentW, -currentH + 12); // Плавный бок
-            ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH); // Округлый капот
+            ctx.moveTo(-currentW + 2, currentH);
+            ctx.quadraticCurveTo(-currentW, 0, -currentW, -currentH + 12);
+            ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH);
             ctx.quadraticCurveTo(currentW, -currentH, currentW, -currentH + 12);
             ctx.quadraticCurveTo(currentW, 0, currentW - 2, currentH);
             ctx.lineTo(currentW - 2, currentH);
@@ -858,6 +868,13 @@
             ctx.lineTo(18 - 4, -currentH);
             ctx.lineTo(18, -currentH + 14);
             ctx.lineTo(18 - 2, currentH);
+        } else if (currentCarModel === 'mark2') {
+            ctx.moveTo(-currentW, currentH);
+            ctx.lineTo(-currentW, -currentH + 4);
+            ctx.lineTo(-currentW + 2, -currentH);
+            ctx.lineTo(currentW - 2, -currentH);
+            ctx.lineTo(currentW, -currentH + 4);
+            ctx.lineTo(currentW, currentH);
         } else if (currentCarModel === 'nissan') {
             ctx.moveTo(-15, 25);
             ctx.lineTo(-15, -22);
@@ -872,23 +889,44 @@
             ctx.quadraticCurveTo(16, -30, 16, -22);
             ctx.lineTo(16, 25);
             ctx.closePath();
+        } else if (currentCarModel === 'egoista') {
+            // ЖЕСТКИЙ СТРЕЛОВИДНЫЙ СИЛУЭТ СТЕЛСА
+            ctx.moveTo(-currentW + 2, currentH);
+            ctx.lineTo(-currentW, -currentH + 18); // Острые углы бампера
+            ctx.lineTo(-currentW + 5, -currentH + 4);
+            ctx.lineTo(0, -currentH - 6); // УЛЬТРА-ОСТРЫЙ НОС ПО ЦЕНТРУ
+            ctx.lineTo(currentW - 5, -currentH + 4);
+            ctx.lineTo(currentW, -currentH + 18);
+            ctx.lineTo(currentW - 2, currentH);
+
+        } else if (currentCarModel === 'ae86') {
+        } else if (currentCarModel === 'ae86') {
+            // Четкий прямоугольный кузов Хачироку
+            ctx.fillRect(-currentW, -currentH, currentW * 2, currentH * 2);
+
+            // ФИРМЕННЫЙ ЧЕРНЫЙ КАПОТ И БАГАЖНИК (PANDA STYLE)
+            ctx.fillStyle = '#1c1c1c';
+            ctx.fillRect(-currentW, -currentH, currentW * 2, 7); // Капот
+            ctx.fillRect(-currentW, currentH - 4, currentW * 2, 4); // Багажник
+            ctx.fillStyle = spec.color; // Возвращаем белый цвет кузова
+
+
+
+            ctx.fillStyle = '#1c1c1c';
+            ctx.fillRect(-currentW, -currentH, currentW * 2, 8);
+            ctx.fillStyle = spec.color; // Возвращаем белый цвет обратно
+
+
         } else if (currentCarModel === 'koenig') {
             ctx.moveTo(-currentW, currentH);
             ctx.lineTo(-currentW, -currentH + 14);
             ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH);
             ctx.quadraticCurveTo(currentW, -currentH, currentW, -currentH + 14);
             ctx.lineTo(currentW, currentH);
-        } else if (currentCarModel === 'mark2') {
-            // Длинный представительский кузов "Самурая"
-            ctx.moveTo(-currentW, currentH);
-            ctx.lineTo(-currentW, -currentH + 4);
-            ctx.lineTo(-currentW + 2, -currentH);
-            ctx.lineTo(currentW - 2, -currentH);
-            ctx.lineTo(currentW, -currentH + 4);
-            ctx.lineTo(currentW, currentH);
         }
-            ctx.closePath();
+        ctx.closePath();
         ctx.fill();
+
 
         // Зеркала
         ctx.fillStyle = '#111111';
@@ -941,6 +979,20 @@
             ctx.lineTo(-11, -8);
             ctx.lineTo(11, -8);
             ctx.lineTo(12, 12);
+        } else if (currentCarModel === 'egoista') {
+            // Оставляем пустой контур, чтобы темный цвет не перекрывал градиент ниже
+        } else if (currentCarModel === 'ae86') {
+        } else if (currentCarModel === 'ae86') {
+            // Четкий прямоугольный кузов Хачироку
+            ctx.fillRect(-currentW, -currentH, currentW * 2, currentH * 2);
+
+            // ФИРМЕННЫЙ ЧЕРНЫЙ КАПОТ И БАГАЖНИК (PANDA STYLE)
+            ctx.fillStyle = '#1c1c1c';
+            ctx.fillRect(-currentW, -currentH, currentW * 2, 7); // Капот
+            ctx.fillRect(-currentW, currentH - 4, currentW * 2, 4); // Багажник
+            ctx.fillStyle = spec.color; // Возвращаем белый цвет кузова
+
+
         } else {
             ctx.moveTo(-11, 12);
             ctx.lineTo(-11, -10);
@@ -951,22 +1003,39 @@
         ctx.fill();
 
 
-        // Лобовое стекло (наложение цвета)
-        ctx.fillStyle = '#1e1e1e';
-        if (currentCarModel === 'lambo') ctx.fillRect(-8, -10, 16, 14);
-        else if (currentCarModel === 'koenig') ctx.fillRect(-9, -2, 18, 12);
-        else if (currentCarModel === 'stock') ctx.fillRect(-10, -5, 20, 14);
-        else if (currentCarModel === 'porsche') ctx.fillRect(-10, -6, 20, 12); // Стекло Порше
-        else if (currentCarModel === 'nissan') ctx.fillRect(-10, -10, 20, 12);
-        else if (currentCarModel === 'corvette') ctx.fillRect(-10, -10, 20, 12);
+        // ЛОБОВОЕ СТЕКЛО С КРАСИВЫМ ГЛЯНЦЕВЫМ БЛИКОМ
+        if (currentCarModel === 'egoista') {
+            // Уникальный неоново-оранжевый градиент для кабины истребителя
+            let egoGrd = ctx.createLinearGradient(-4, -12, 4, 8);
+            egoGrd.addColorStop(0, '#ff9900'); // Яркий upper
+            egoGrd.addColorStop(0.3, '#ff5500'); // Насыщенный центр
+            egoGrd.addColorStop(1, '#220800'); // Тёмное отражение снизу
+            ctx.fillStyle = egoGrd;
+            ctx.fillRect(-4, -12, 8, 20);
 
-        if (currentCarModel === 'audi') {
-            ctx.fillStyle = '#1a1d22';
-            ctx.fillRect(-currentW, 6, 2, 14);
-            ctx.fillRect(currentW - 2, 6, 2, 14);
-            ctx.fillStyle = '#111111';
-            ctx.fillRect(-7, -currentH, 14, 3);
+            // Тонкая неоновая полоска света по центру стекла
+            ctx.fillStyle = 'rgba(255, 200, 100, 0.6)';
+            ctx.fillRect(-0.5, -10, 1, 16);
+        } else {
+            // Элитный темный глянец для всех остальных машин
+            let glassGrd = ctx.createLinearGradient(-10, -10, 10, 14);
+            glassGrd.addColorStop(0, '#3a3f4d');   // Блик от солнца сверху-слева
+            glassGrd.addColorStop(0.4, '#1a1c23'); // Глубокий тонированный цвет
+            glassGrd.addColorStop(1, '#0d0e12');   // Плотная тень снизу
+            ctx.fillStyle = glassGrd;
+
+            // Отрисовываем стёкла по твоей родной сетке координат
+            if (currentCarModel === 'lambo') ctx.fillRect(-8, -10, 16, 14);
+            else if (currentCarModel === 'koenig') ctx.fillRect(-9, -2, 18, 12);
+            else if (currentCarModel === 'stock') ctx.fillRect(-10, -5, 20, 14);
+            else if (currentCarModel === 'porsche') ctx.fillRect(-10, -6, 20, 12);
+            else if (currentCarModel === 'nissan') ctx.fillRect(-10, -10, 20, 12);
+            else if (currentCarModel === 'corvette') ctx.fillRect(-10, -10, 20, 12);
+            else if (currentCarModel === 'mark2') ctx.fillRect(-11, -8, 22, 12);
+            else if (currentCarModel === 'ae86') ctx.fillRect(-currentW + 2, -3, (currentW * 2) - 4, 9); // ОДНА СТРОКА ТУТ!
         }
+
+
 
         // Спойлер / Детали капота
         ctx.fillStyle = '#111111';
@@ -1048,10 +1117,22 @@
         } else if (currentCarModel === 'audi') {
             ctx.fillRect(-16 + 1, -33 + 1, 5, 2);
             ctx.fillRect(16 - 6, -33 + 1, 5, 2);
+        } else if (currentCarModel === 'egoista') {
+            // ЗЛЫЕ ТОНКИЕ СВЕТОДИОДНЫЕ ПОЛОСЫ
+            ctx.fillRect(-currentW + 1, -currentH + 10, 4, 1.5);
+            ctx.fillRect(currentW - 5, -currentH + 10, 4, 1.5);
+
+        } else if (currentCarModel === 'ae86') {
+            // Прямоугольные фары Левина строго по краям черного капота
+            ctx.fillRect(-currentW, -currentH + 1, 4, 2);
+            ctx.fillRect(currentW - 4, -currentH + 1, 4, 2);
+
+
         } else {
             ctx.fillRect(-11, -30, 4, 2);
             ctx.fillRect(7, -30, 4, 2);
         }
+
 
         // Стопы задние
         ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
@@ -1082,6 +1163,17 @@
             ctx.fillStyle = '#ff9900';
             ctx.fillRect(-currentW + 1, currentH - 2, 2, 2);
             ctx.fillRect(currentW - 3, currentH - 2, 2, 2);
+        } else if (currentCarModel === 'egoista') {
+            // Двойные футуристичные стоп-сигналы по краям кузова
+            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#660000';
+            ctx.fillRect(-currentW + 1, currentH - 2, 4, 2);
+            ctx.fillRect(currentW - 5, currentH - 2, 4, 2);
+
+        } else if (currentCarModel === 'ae86') {
+            // Олдскульные квадратные фонари
+            ctx.fillRect(-currentW + 1, currentH - 2, 3, 2);
+            ctx.fillRect(currentW - 4, currentH - 2, 3, 2);
+
         } else {
             ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
             ctx.fillRect(-11, 24, 4, 2);
@@ -1112,6 +1204,7 @@
 
         ctx.restore();
     }
+
 
 
     // ==========================================

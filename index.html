@@ -371,40 +371,55 @@
     // КОНФИГУРАЦИЯ И ДАННЫЕ
     // ==========================================
     const carSpecs = {
-        stock:  { maxSpeedPhys: 13.12, power: 0.22, maxSpeedHUD: 210, color: '#ffcc00' },
-        audi:   { maxSpeedPhys: 18.12, power: 0.29, maxSpeedHUD: 290, color: '#536271' },
-        lambo:  { maxSpeedPhys: 21.87, power: 0.35, maxSpeedHUD: 350, color: '#ff3333' },
-        nissan: { maxSpeedPhys: 19.87, power: 0.31, maxSpeedHUD: 310, color: '#ffffff' },
+        stock:    { maxSpeedPhys: 13.12, power: 0.22, maxSpeedHUD: 210, color: '#ffcc00' },
+        audi:     { maxSpeedPhys: 18.12, power: 0.29, maxSpeedHUD: 290, color: '#536271' },
+        porsche:  { maxSpeedPhys: 19.18, power: 0.30, maxSpeedHUD: 299, color: '#e60000' },
+        nissan:   { maxSpeedPhys: 19.87, power: 0.31, maxSpeedHUD: 310, color: '#ffffff' },
+        lambo:    { maxSpeedPhys: 21.87, power: 0.35, maxSpeedHUD: 350, color: '#ff3333' },
         corvette: { maxSpeedPhys: 22.87, power: 0.37, maxSpeedHUD: 360, color: '#ffdd00' },
-        koenig: { maxSpeedPhys: 30.00, power: 0.50, maxSpeedHUD: 480, color: '#00e5ff' }
+        koenig:   { maxSpeedPhys: 30.00, power: 0.50, maxSpeedHUD: 480, color: '#00e5ff' },
+        mark2:    { maxSpeedPhys: 16.50, power: 0.28, maxSpeedHUD: 275, color: '#fcfcfc' },
+
     };
+
 
     const carNames = {
         stock: 'BMW M8',
         audi: 'AUDI R8',
+        porsche: 'PORSCHE 911',
         lambo: 'LAMBORGHINI',
         nissan: 'NISSAN GT-R',
         corvette: 'CORVETTE',
-        koenig: 'KOENIGSEGG'
+        koenig: 'KOENIGSEGG',
+        mark2: 'TOYOTA MARK II',
+
     };
+
 
     const carPrices = {
         stock: 0,
         audi: 100000,
+        porsche: 619000,
         lambo: 200000,
         nissan: 150000,
         corvette: 250000,
-        koenig: 600000
+        koenig: 600000,
+        mark2: 85000,
+
     };
 
     const carDimensions = {
         stock:    { w: 14, h: 25, frontY: -16, backY: 14, wheelW: 14 },
         audi:     { w: 16, h: 33, frontY: -22, backY: 21, wheelW: 16 },
+        porsche:  { w: 15, h: 28, frontY: -18, backY: 17, wheelW: 15 },
         lambo:    { w: 18, h: 30, frontY: -18, backY: 18, wheelW: 18 },
         nissan:   { w: 15, h: 25, frontY: -16, backY: 14, wheelW: 15 },
         corvette: { w: 16, h: 25, frontY: -16, backY: 14, wheelW: 16 },
-        koenig:   { w: 15, h: 34, frontY: -20, backY: 22, wheelW: 15 }
+        koenig:   { w: 15, h: 34, frontY: -20, backY: 22, wheelW: 15 },
+        mark2: { w: 16, h: 31, frontY: -20, backY: 19, wheelW: 16 }
+
     };
+
 
     // ==========================================
     // АУДИО СИСТЕМА
@@ -827,6 +842,14 @@
             ctx.lineTo(currentW - 4, -currentH);
             ctx.lineTo(currentW, -currentH + 10);
             ctx.lineTo(currentW, currentH);
+        } else if (currentCarModel === 'porsche') {
+            // ФИРМЕННЫЙ ОКРУГЛЫЙ КУЗОВ ПОРШЕ 911
+            ctx.moveTo(-currentW + 2, currentH); // Задние крылья
+            ctx.quadraticCurveTo(-currentW, 0, -currentW, -currentH + 12); // Плавный бок
+            ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH); // Округлый капот
+            ctx.quadraticCurveTo(currentW, -currentH, currentW, -currentH + 12);
+            ctx.quadraticCurveTo(currentW, 0, currentW - 2, currentH);
+            ctx.lineTo(currentW - 2, currentH);
         } else if (currentCarModel === 'lambo') {
             ctx.moveTo(-18 + 2, currentH);
             ctx.lineTo(-18, -currentH + 14);
@@ -855,8 +878,16 @@
             ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH);
             ctx.quadraticCurveTo(currentW, -currentH, currentW, -currentH + 14);
             ctx.lineTo(currentW, currentH);
+        } else if (currentCarModel === 'mark2') {
+            // Длинный представительский кузов "Самурая"
+            ctx.moveTo(-currentW, currentH);
+            ctx.lineTo(-currentW, -currentH + 4);
+            ctx.lineTo(-currentW + 2, -currentH);
+            ctx.lineTo(currentW - 2, -currentH);
+            ctx.lineTo(currentW, -currentH + 4);
+            ctx.lineTo(currentW, currentH);
         }
-        ctx.closePath();
+            ctx.closePath();
         ctx.fill();
 
         // Зеркала
@@ -871,35 +902,25 @@
             ctx.moveTo(-11, 14);
             ctx.quadraticCurveTo(-12, -12, 0, -14);
             ctx.quadraticCurveTo(12, -12, 11, 14);
+        } else if (currentCarModel === 'porsche') {
+            ctx.moveTo(-11, 12);
+            ctx.quadraticCurveTo(-11, -8, 0, -10);
+            ctx.quadraticCurveTo(11, -8, 11, 12);
         } else if (currentCarModel === 'lambo') {
             ctx.moveTo(-13, 14);
             ctx.lineTo(-10, -19);
             ctx.lineTo(10, -19);
             ctx.lineTo(13, 14);
         } else if (currentCarModel === 'nissan') {
-            ctx.fillStyle = '#111317';
-            ctx.beginPath();
             ctx.moveTo(-11, 12);
             ctx.lineTo(-11, -10);
             ctx.lineTo(11, -10);
             ctx.lineTo(11, 12);
-            ctx.closePath();
-            ctx.fill();
         } else if (currentCarModel === 'corvette') {
-            ctx.fillStyle = '#111317';
-            ctx.beginPath();
             ctx.moveTo(-11, 12);
             ctx.lineTo(-11, -10);
             ctx.lineTo(11, -10);
             ctx.lineTo(11, 12);
-            ctx.closePath();
-            ctx.fill();
-            // Воздухозаборники
-            ctx.fillStyle = '#0a0a0c';
-            ctx.beginPath();
-            ctx.arc(-10, 12, 3, 0, Math.PI * 2);
-            ctx.arc(10, 12, 3, 0, Math.PI * 2);
-            ctx.fill();
         } else if (currentCarModel === 'audi') {
             ctx.moveTo(-13, -2);
             ctx.quadraticCurveTo(-11, -14, 0, -15);
@@ -915,6 +936,11 @@
             ctx.fillStyle = '#7a4f3d';
             ctx.fillRect(-8, 2, 5, 3);
             ctx.fillRect(3, 2, 5, 3);
+        } else if (currentCarModel === 'mark2') {
+            ctx.moveTo(-12, 12);
+            ctx.lineTo(-11, -8);
+            ctx.lineTo(11, -8);
+            ctx.lineTo(12, 12);
         } else {
             ctx.moveTo(-11, 12);
             ctx.lineTo(-11, -10);
@@ -924,11 +950,13 @@
         ctx.closePath();
         ctx.fill();
 
-        // Лобовое стекло
+
+        // Лобовое стекло (наложение цвета)
         ctx.fillStyle = '#1e1e1e';
         if (currentCarModel === 'lambo') ctx.fillRect(-8, -10, 16, 14);
         else if (currentCarModel === 'koenig') ctx.fillRect(-9, -2, 18, 12);
         else if (currentCarModel === 'stock') ctx.fillRect(-10, -5, 20, 14);
+        else if (currentCarModel === 'porsche') ctx.fillRect(-10, -6, 20, 12); // Стекло Порше
         else if (currentCarModel === 'nissan') ctx.fillRect(-10, -10, 20, 12);
         else if (currentCarModel === 'corvette') ctx.fillRect(-10, -10, 20, 12);
 
@@ -940,7 +968,7 @@
             ctx.fillRect(-7, -currentH, 14, 3);
         }
 
-        // Спойлер
+        // Спойлер / Детали капота
         ctx.fillStyle = '#111111';
         if (currentCarModel === 'stock') {
             ctx.beginPath();
@@ -957,10 +985,7 @@
             ctx.fill();
             ctx.fillRect(-2, -22, 4, 2);
         } else if (currentCarModel === 'nissan') {
-            ctx.fillStyle = '#111111';
-            // Основание
             ctx.fillRect(-10, 18, 20, 3);
-            // Крыло
             ctx.beginPath();
             ctx.moveTo(-14, 16);
             ctx.lineTo(-10, 18);
@@ -969,15 +994,24 @@
             ctx.closePath();
             ctx.fill();
         } else if (currentCarModel === 'corvette') {
-            ctx.fillStyle = '#111111';
             ctx.fillRect(-18, 25, 36, 5);
         } else if (currentCarModel === 'koenig') {
             ctx.fillRect(-2, -24, 4, 10);
+        } else if (currentCarModel === 'corvette') {
+            // Воздухозаборники на капоте
+            ctx.fillStyle = '#0a0a0c';
+            ctx.beginPath();
+            ctx.arc(-10, 12, 3, 0, Math.PI * 2);
+            ctx.arc(10, 12, 3, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         // Задний спойлер
+        ctx.fillStyle = '#111111';
         if (currentCarModel === 'lambo') {
             ctx.fillRect(-18, 30 - 3, 18 * 2, 4);
+        } else if (currentCarModel === 'porsche') {
+            ctx.fillRect(-12, currentH - 3, 24, 3); // Спойлер "Ducktail" для Порше
         } else if (currentCarModel === 'nissan') {
             ctx.fillRect(-15, 18 - 2, 30, 3);
         } else if (currentCarModel === 'corvette') {
@@ -997,12 +1031,15 @@
         if (currentCarModel === 'lambo') {
             ctx.fillRect(-18 + 2, -30 + 1, 6, 3);
             ctx.fillRect(18 - 8, -30 + 1, 6, 3);
+        } else if (currentCarModel === 'porsche') {
+            ctx.beginPath();
+            ctx.arc(-9, -currentH + 3.5, 2.5, 0, Math.PI * 2);
+            ctx.arc(9, -currentH + 3.5, 2.5, 0, Math.PI * 2);
+            ctx.fill();
         } else if (currentCarModel === 'nissan') {
-            ctx.fillStyle = '#ffffff';
             ctx.fillRect(-11, -30, 4, 2);
             ctx.fillRect(7, -30, 4, 2);
         } else if (currentCarModel === 'corvette') {
-            ctx.fillStyle = '#ffffff';
             ctx.fillRect(-11, -30, 4, 2);
             ctx.fillRect(7, -30, 4, 2);
         } else if (currentCarModel === 'koenig') {
@@ -1016,17 +1053,18 @@
             ctx.fillRect(7, -30, 4, 2);
         }
 
-        // Стопы
+        // Стопы задние
         ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
         if (currentCarModel === 'lambo') {
             ctx.fillRect(-18 + 2, 30 - 1, 4, 2);
             ctx.fillRect(18 - 6, 30 - 1, 4, 2);
+        } else if (currentCarModel === 'porsche') {
+            ctx.fillRect(-11, currentH - 1, 4, 2); // Стопы Порше
+            ctx.fillRect(7, currentH - 1, 4, 2);
         } else if (currentCarModel === 'nissan') {
-            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
             ctx.fillRect(-11, 24, 4, 2);
             ctx.fillRect(7, 24, 4, 2);
         } else if (currentCarModel === 'corvette') {
-            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
             ctx.fillRect(-11, 24, 4, 2);
             ctx.fillRect(7, 24, 4, 2);
         } else if (currentCarModel === 'koenig') {
@@ -1035,16 +1073,27 @@
         } else if (currentCarModel === 'audi') {
             ctx.fillRect(-16 + 1, 33 - 1, 5, 2);
             ctx.fillRect(16 - 6, 33 - 1, 5, 2);
+        } else if (currentCarModel === 'mark2') {
+            // Легендарный сплошной "фонарь" Марка на всю ширину задницы
+            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#770000';
+            ctx.fillRect(-currentW + 1, currentH - 2, (currentW * 2) - 2, 2);
+
+            // Маленькие оранжевые поворотники по самым краям фонаря
+            ctx.fillStyle = '#ff9900';
+            ctx.fillRect(-currentW + 1, currentH - 2, 2, 2);
+            ctx.fillRect(currentW - 3, currentH - 2, 2, 2);
         } else {
+            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
             ctx.fillRect(-11, 24, 4, 2);
             ctx.fillRect(7, 24, 4, 2);
         }
+
 
         // Колёса
         ctx.fillStyle = '#0a0a0c';
         const { frontY, backY, wheelW } = dims;
 
-// Передние колеса (с поворотом)
+        // Передние колеса (с поворотом)
         ctx.save();
         ctx.translate(-wheelW, frontY);
         ctx.rotate(car.steerAngle);
@@ -1057,84 +1106,13 @@
         ctx.fillRect(-3, -6, 6, 13);
         ctx.restore();
 
-// Задние колеса (прямые)
+        // Задние колеса (прямые)
         ctx.fillRect(-wheelW - 1, backY, 6, 13);
         ctx.fillRect(wheelW - 5, backY, 6, 13);
 
         ctx.restore();
     }
 
-    function renderWorld() {
-        ctx.save();
-        let shakeIntensity = (isDrifting && speedScalar > 2 && driftSlip > 1.3) ? (Math.random() - 0.5) * (driftSlip * 1.3) : 0;
-        ctx.translate(width / 2 + shakeIntensity, height / 2 + shakeIntensity);
-
-        // Асфальт
-        ctx.fillStyle = '#1c1f26';
-        ctx.fillRect(-width, -height, width * 2, height * 2);
-
-        // Разметка
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        roadLines.forEach(line => {
-            ctx.save();
-            let rx = ((line.x - car.x) % 2500 + 2500) % 2500 - 1250;
-            let ry = ((line.y - car.y) % 2500 + 2500) % 2500 - 1250;
-            ctx.translate(rx, ry);
-            ctx.rotate(line.angle);
-            ctx.fillRect(-line.w / 2, -line.h / 2, line.w, line.h);
-            ctx.restore();
-        });
-
-        // Следы шин
-        tireTracks.forEach(t => {
-            t.alpha -= 0.0004;
-            if (t.alpha > 0) {
-                ctx.fillStyle = `rgba(10, 12, 15, ${t.alpha})`;
-                ctx.fillRect(t.x1 - car.x, t.y1 - car.y, 3.5, 3.5);
-                ctx.fillRect(t.x2 - car.x, t.y2 - car.y, 3.5, 3.5);
-            }
-        });
-
-        // Контейнеры
-        containers.forEach(box => {
-            ctx.save();
-            ctx.translate(box.x - car.x, box.y - car.y);
-            ctx.rotate(box.angle);
-            ctx.fillStyle = 'rgba(5, 6, 8, 0.35)';
-            ctx.fillRect(-box.w / 2 + 8, -box.h / 2 + 8, box.w, box.h);
-            ctx.fillStyle = box.color;
-            ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-            for (let step = -box.w / 2 + 8; step < box.w / 2; step += 12) {
-                ctx.fillRect(step, -box.h / 2 + 4, 3, box.h - 8);
-            }
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.font = 'bold 8px Share Tech Mono';
-            ctx.fillText("MRK-350-UA", -box.w / 2 + 10, 0);
-            ctx.restore();
-        });
-
-        // Дым
-        smokeParticles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.size += 0.55;
-            p.alpha -= 0.012;
-            if (p.alpha > 0) {
-                ctx.fillStyle = `rgba(225, 230, 240, ${p.alpha})`;
-                ctx.beginPath();
-                ctx.arc(p.x - car.x, p.y - car.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        });
-
-        // Машина
-        if (collisionCooldown === 0 || Math.floor(collisionCooldown / 4) % 2 === 0) {
-            drawCar();
-        }
-
-        ctx.restore();
-    }
 
     // ==========================================
     // ОСНОВНОЙ ЦИКЛ
@@ -1323,7 +1301,79 @@
             }
         }
     }
+    function renderWorld() {
+        ctx.save();
+        let shakeIntensity = (isDrifting && speedScalar > 2 && driftSlip > 1.3) ? (Math.random() - 0.5) * (driftSlip * 1.3) : 0;
+        ctx.translate(width / 2 + shakeIntensity, height / 2 + shakeIntensity);
 
+        // Асфальт
+        ctx.fillStyle = '#1c1f26';
+        ctx.fillRect(-width, -height, width * 2, height * 2);
+
+        // Разметка
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        roadLines.forEach(line => {
+            ctx.save();
+            let rx = ((line.x - car.x) % 2500 + 2500) % 2500 - 1250;
+            let ry = ((line.y - car.y) % 2500 + 2500) % 2500 - 1250;
+            ctx.translate(rx, ry);
+            ctx.rotate(line.angle);
+            ctx.fillRect(-line.w / 2, -line.h / 2, line.w, line.h);
+            ctx.restore();
+        });
+
+        // Следы шин
+        tireTracks.forEach(t => {
+            t.alpha -= 0.0004;
+            if (t.alpha > 0) {
+                ctx.fillStyle = `rgba(10, 12, 15, ${t.alpha})`;
+                ctx.fillRect(t.x1 - car.x, t.y1 - car.y, 3.5, 3.5);
+                ctx.fillRect(t.x2 - car.x, t.y2 - car.y, 3.5, 3.5);
+            }
+        });
+
+        // Контейнеры
+        containers.forEach(box => {
+            ctx.save();
+            ctx.translate(box.x - car.x, box.y - car.y);
+            ctx.rotate(box.angle);
+            ctx.fillStyle = 'rgba(5, 6, 8, 0.35)';
+            ctx.fillRect(-box.w / 2 + 8, -box.h / 2 + 8, box.w, box.h);
+            ctx.fillStyle = box.color;
+            ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            for (let step = -box.w / 2 + 8; step < box.w / 2; step += 12) {
+                ctx.fillRect(step, -box.h / 2 + 4, 3, box.h - 8);
+            }
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.font = 'bold 8px Share Tech Mono';
+            ctx.fillText("MRK-350-UA", -box.w / 2 + 10, 0);
+            ctx.restore();
+        });
+
+        // Дым
+        smokeParticles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.size += 0.55;
+            p.alpha -= 0.012;
+            if (p.alpha > 0) {
+                ctx.fillStyle = `rgba(225, 230, 240, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x - car.x, p.y - car.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+
+        // Машина
+        if (collisionCooldown === 0 || Math.floor(collisionCooldown / 4) % 2 === 0) {
+            drawCar();
+        }
+
+        ctx.restore();
+    }
+
+    updateBalanceUI();
     updateBalanceUI();
 </script>
 </body>

@@ -380,10 +380,10 @@
         corvette: { maxSpeedPhys: 22.87, power: 0.37, maxSpeedHUD: 360, color: '#ffdd00' },
         egoista:  { maxSpeedPhys: 37.40, power: 0.65, maxSpeedHUD: 599, color: '#3a3f47' },
         koenig:   { maxSpeedPhys: 30.00, power: 0.50, maxSpeedHUD: 480, color: '#00e5ff' },
-        ae86:     { maxSpeedPhys: 8.50,  power: 0.16, maxSpeedHUD: 108, color: '#7a828a' } // МЕНЯЕМ ЦВЕТ НА СЕРЫЙ ТУТ!
+        ae86:     { maxSpeedPhys: 8.50,  power: 0.16, maxSpeedHUD: 108, color: '#7a828a' },
+        mclaren:  { maxSpeedPhys: 33.50, power: 0.55, maxSpeedHUD: 490, color: '#ff8800' },
+        tuatara:  { maxSpeedPhys: 34.12, power: 0.56, maxSpeedHUD: 501, color: '#d3d3d3' }
     };
-
-
 
     const carNames = {
         stock: 'BMW M8',
@@ -391,15 +391,14 @@
         porsche: 'PORSCHE 911',
         lambo: 'LAMBORGHINI',
         nissan: 'NISSAN GT-R',
-        corvette: 'CORVETTE',
-        koenig: 'KOENIGSEGG',
+        corvette: 'CORVETTE C7',
+        koenig: 'KOENIGSEGG JESKO V8',
         mark2: 'TOYOTA MARK II',
         egoista: 'LAMBO EGOISTA',
         ae86: 'TOYOTA AE86 LEVIN',
-
-
+        mclaren: 'McLAREN 570S MSO-X',
+        tuatara: 'SSC TUATARA'
     };
-
 
     const carPrices = {
         stock: 0,
@@ -412,9 +411,8 @@
         mark2: 185000,
         egoista: 2900000,
         ae86: 20000,
-
-
-
+        mclaren: 1600000,
+        tuatara: 2000000
     };
 
     const carDimensions = {
@@ -428,9 +426,9 @@
         egoista:  { w: 18, h: 32, frontY: -19, backY: 19, wheelW: 18 },
         koenig:   { w: 15, h: 34, frontY: -20, backY: 22, wheelW: 15 },
         ae86:     { w: 10, h: 22, frontY: -10, backY: 10, wheelW: 10 },
+        mclaren:  { w: 17, h: 32, frontY: -20, backY: 20, wheelW: 17 },
+        tuatara:  { w: 18, h: 35, frontY: -22, backY: 22, wheelW: 18 }
     };
-
-
 
     // ==========================================
     // АУДИО СИСТЕМА
@@ -890,33 +888,35 @@
             ctx.lineTo(16, 25);
             ctx.closePath();
         } else if (currentCarModel === 'egoista') {
-            // ЖЕСТКИЙ СТРЕЛОВИДНЫЙ СИЛУЭТ СТЕЛСА
             ctx.moveTo(-currentW + 2, currentH);
-            ctx.lineTo(-currentW, -currentH + 18); // Острые углы бампера
+            ctx.lineTo(-currentW, -currentH + 18);
             ctx.lineTo(-currentW + 5, -currentH + 4);
-            ctx.lineTo(0, -currentH - 6); // УЛЬТРА-ОСТРЫЙ НОС ПО ЦЕНТРУ
+            ctx.lineTo(0, -currentH - 6);
             ctx.lineTo(currentW - 5, -currentH + 4);
             ctx.lineTo(currentW, -currentH + 18);
             ctx.lineTo(currentW - 2, currentH);
-
         } else if (currentCarModel === 'ae86') {
-        } else if (currentCarModel === 'ae86') {
-            // Четкий прямоугольный кузов Хачироку
             ctx.fillRect(-currentW, -currentH, currentW * 2, currentH * 2);
-
-            // ФИРМЕННЫЙ ЧЕРНЫЙ КАПОТ И БАГАЖНИК (PANDA STYLE)
             ctx.fillStyle = '#1c1c1c';
-            ctx.fillRect(-currentW, -currentH, currentW * 2, 7); // Капот
-            ctx.fillRect(-currentW, currentH - 4, currentW * 2, 4); // Багажник
-            ctx.fillStyle = spec.color; // Возвращаем белый цвет кузова
-
-
-
-            ctx.fillStyle = '#1c1c1c';
-            ctx.fillRect(-currentW, -currentH, currentW * 2, 8);
-            ctx.fillStyle = spec.color; // Возвращаем белый цвет обратно
-
-
+            ctx.fillRect(-currentW, -currentH, currentW * 2, 7);
+            ctx.fillRect(-currentW, currentH - 4, currentW * 2, 4);
+            ctx.fillStyle = spec.color;
+        } else if (currentCarModel === 'mclaren') {
+            // McLaren 570S MSO-X - агрессивный спортивный дизайн
+            ctx.moveTo(-currentW + 2, currentH);
+            ctx.lineTo(-currentW, -currentH + 12);
+            ctx.lineTo(-currentW + 3, -currentH);
+            ctx.lineTo(0, -currentH - 2);
+            ctx.lineTo(currentW - 3, -currentH);
+            ctx.lineTo(currentW, -currentH + 12);
+            ctx.lineTo(currentW - 2, currentH);
+        } else if (currentCarModel === 'tuatara') {
+            // SSC Tuatara - белый кузов с красными акцентами
+            ctx.moveTo(-currentW + 3, currentH);
+            ctx.lineTo(-currentW, -currentH + 14);
+            ctx.quadraticCurveTo(-currentW, -currentH, 0, -currentH - 3);
+            ctx.quadraticCurveTo(currentW, -currentH, currentW, -currentH + 14);
+            ctx.lineTo(currentW - 3, currentH);
         } else if (currentCarModel === 'koenig') {
             ctx.moveTo(-currentW, currentH);
             ctx.lineTo(-currentW, -currentH + 14);
@@ -927,6 +927,11 @@
         ctx.closePath();
         ctx.fill();
 
+        // Красная полоса для Tuatara
+        if (currentCarModel === 'tuatara') {
+            ctx.fillStyle = '#ff3333';
+            ctx.fillRect(-1, -currentH, 2, currentH * 2);
+        }
 
         // Зеркала
         ctx.fillStyle = '#111111';
@@ -980,19 +985,17 @@
             ctx.lineTo(11, -8);
             ctx.lineTo(12, 12);
         } else if (currentCarModel === 'egoista') {
-            // Оставляем пустой контур, чтобы темный цвет не перекрывал градиент ниже
+            // Пустой контур
         } else if (currentCarModel === 'ae86') {
-        } else if (currentCarModel === 'ae86') {
-            // Четкий прямоугольный кузов Хачироку
-            ctx.fillRect(-currentW, -currentH, currentW * 2, currentH * 2);
-
-            // ФИРМЕННЫЙ ЧЕРНЫЙ КАПОТ И БАГАЖНИК (PANDA STYLE)
-            ctx.fillStyle = '#1c1c1c';
-            ctx.fillRect(-currentW, -currentH, currentW * 2, 7); // Капот
-            ctx.fillRect(-currentW, currentH - 4, currentW * 2, 4); // Багажник
-            ctx.fillStyle = spec.color; // Возвращаем белый цвет кузова
-
-
+            ctx.fillRect(-currentW + 2, -3, (currentW * 2) - 4, 9);
+        } else if (currentCarModel === 'mclaren') {
+            ctx.moveTo(-12, 10);
+            ctx.quadraticCurveTo(-12, -10, 0, -12);
+            ctx.quadraticCurveTo(12, -10, 12, 10);
+        } else if (currentCarModel === 'tuatara') {
+            ctx.moveTo(-13, 12);
+            ctx.quadraticCurveTo(-13, -12, 0, -15);
+            ctx.quadraticCurveTo(13, -12, 13, 12);
         } else {
             ctx.moveTo(-11, 12);
             ctx.lineTo(-11, -10);
@@ -1002,29 +1005,24 @@
         ctx.closePath();
         ctx.fill();
 
-
-        // ЛОБОВОЕ СТЕКЛО С КРАСИВЫМ ГЛЯНЦЕВЫМ БЛИКОМ
+        // Глянцевые блики на окнах
         if (currentCarModel === 'egoista') {
-            // Уникальный неоново-оранжевый градиент для кабины истребителя
             let egoGrd = ctx.createLinearGradient(-4, -12, 4, 8);
-            egoGrd.addColorStop(0, '#ff9900'); // Яркий upper
-            egoGrd.addColorStop(0.3, '#ff5500'); // Насыщенный центр
-            egoGrd.addColorStop(1, '#220800'); // Тёмное отражение снизу
+            egoGrd.addColorStop(0, '#ff9900');
+            egoGrd.addColorStop(0.3, '#ff5500');
+            egoGrd.addColorStop(1, '#220800');
             ctx.fillStyle = egoGrd;
             ctx.fillRect(-4, -12, 8, 20);
 
-            // Тонкая неоновая полоска света по центру стекла
             ctx.fillStyle = 'rgba(255, 200, 100, 0.6)';
             ctx.fillRect(-0.5, -10, 1, 16);
         } else {
-            // Элитный темный глянец для всех остальных машин
             let glassGrd = ctx.createLinearGradient(-10, -10, 10, 14);
-            glassGrd.addColorStop(0, '#3a3f4d');   // Блик от солнца сверху-слева
-            glassGrd.addColorStop(0.4, '#1a1c23'); // Глубокий тонированный цвет
-            glassGrd.addColorStop(1, '#0d0e12');   // Плотная тень снизу
+            glassGrd.addColorStop(0, '#3a3f4d');
+            glassGrd.addColorStop(0.4, '#1a1c23');
+            glassGrd.addColorStop(1, '#0d0e12');
             ctx.fillStyle = glassGrd;
 
-            // Отрисовываем стёкла по твоей родной сетке координат
             if (currentCarModel === 'lambo') ctx.fillRect(-8, -10, 16, 14);
             else if (currentCarModel === 'koenig') ctx.fillRect(-9, -2, 18, 12);
             else if (currentCarModel === 'stock') ctx.fillRect(-10, -5, 20, 14);
@@ -1032,10 +1030,10 @@
             else if (currentCarModel === 'nissan') ctx.fillRect(-10, -10, 20, 12);
             else if (currentCarModel === 'corvette') ctx.fillRect(-10, -10, 20, 12);
             else if (currentCarModel === 'mark2') ctx.fillRect(-11, -8, 22, 12);
-            else if (currentCarModel === 'ae86') ctx.fillRect(-currentW + 2, -3, (currentW * 2) - 4, 9); // ОДНА СТРОКА ТУТ!
+            else if (currentCarModel === 'ae86') ctx.fillRect(-currentW + 2, -3, (currentW * 2) - 4, 9);
+            else if (currentCarModel === 'mclaren') ctx.fillRect(-11, -8, 22, 14);
+            else if (currentCarModel === 'tuatara') ctx.fillRect(-12, -10, 24, 16);
         }
-
-
 
         // Спойлер / Детали капота
         ctx.fillStyle = '#111111';
@@ -1066,13 +1064,6 @@
             ctx.fillRect(-18, 25, 36, 5);
         } else if (currentCarModel === 'koenig') {
             ctx.fillRect(-2, -24, 4, 10);
-        } else if (currentCarModel === 'corvette') {
-            // Воздухозаборники на капоте
-            ctx.fillStyle = '#0a0a0c';
-            ctx.beginPath();
-            ctx.arc(-10, 12, 3, 0, Math.PI * 2);
-            ctx.arc(10, 12, 3, 0, Math.PI * 2);
-            ctx.fill();
         }
 
         // Задний спойлер
@@ -1080,7 +1071,7 @@
         if (currentCarModel === 'lambo') {
             ctx.fillRect(-18, 30 - 3, 18 * 2, 4);
         } else if (currentCarModel === 'porsche') {
-            ctx.fillRect(-12, currentH - 3, 24, 3); // Спойлер "Ducktail" для Порше
+            ctx.fillRect(-12, currentH - 3, 24, 3);
         } else if (currentCarModel === 'nissan') {
             ctx.fillRect(-15, 18 - 2, 30, 3);
         } else if (currentCarModel === 'corvette') {
@@ -1091,6 +1082,13 @@
             ctx.fillRect(15 + 1, 34 - 7, 2, 5);
         } else if (currentCarModel === 'audi') {
             ctx.fillRect(-16 + 1, 33 - 2, (16 * 2) - 2, 2);
+        } else if (currentCarModel === 'mclaren') {
+            ctx.fillRect(-currentW - 4, currentH - 2, (currentW * 2) + 8, 3);
+        } else if (currentCarModel === 'tuatara') {
+            ctx.fillRect(-currentW - 5, currentH - 2, (currentW * 2) + 10, 4);
+            ctx.fillStyle = '#ff3333';
+            ctx.fillRect(-currentW - 5, currentH - 2, 3, 4);
+            ctx.fillRect(currentW + 2, currentH - 2, 3, 4);
         } else {
             ctx.fillRect(-17, 25, 34, 5);
         }
@@ -1118,21 +1116,21 @@
             ctx.fillRect(-16 + 1, -33 + 1, 5, 2);
             ctx.fillRect(16 - 6, -33 + 1, 5, 2);
         } else if (currentCarModel === 'egoista') {
-            // ЗЛЫЕ ТОНКИЕ СВЕТОДИОДНЫЕ ПОЛОСЫ
             ctx.fillRect(-currentW + 1, -currentH + 10, 4, 1.5);
             ctx.fillRect(currentW - 5, -currentH + 10, 4, 1.5);
-
         } else if (currentCarModel === 'ae86') {
-            // Прямоугольные фары Левина строго по краям черного капота
             ctx.fillRect(-currentW, -currentH + 1, 4, 2);
             ctx.fillRect(currentW - 4, -currentH + 1, 4, 2);
-
-
+        } else if (currentCarModel === 'mclaren') {
+            ctx.fillRect(-18 + 2, -30 + 1, 6, 3);
+            ctx.fillRect(18 - 8, -30 + 1, 6, 3);
+        } else if (currentCarModel === 'tuatara') {
+            ctx.fillRect(-14, -currentH + 2, 5, 2.5);
+            ctx.fillRect(9, -currentH + 2, 5, 2.5);
         } else {
             ctx.fillRect(-11, -30, 4, 2);
             ctx.fillRect(7, -30, 4, 2);
         }
-
 
         // Стопы задние
         ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
@@ -1140,7 +1138,7 @@
             ctx.fillRect(-18 + 2, 30 - 1, 4, 2);
             ctx.fillRect(18 - 6, 30 - 1, 4, 2);
         } else if (currentCarModel === 'porsche') {
-            ctx.fillRect(-11, currentH - 1, 4, 2); // Стопы Порше
+            ctx.fillRect(-11, currentH - 1, 4, 2);
             ctx.fillRect(7, currentH - 1, 4, 2);
         } else if (currentCarModel === 'nissan') {
             ctx.fillRect(-11, 24, 4, 2);
@@ -1155,31 +1153,32 @@
             ctx.fillRect(-16 + 1, 33 - 1, 5, 2);
             ctx.fillRect(16 - 6, 33 - 1, 5, 2);
         } else if (currentCarModel === 'mark2') {
-            // Легендарный сплошной "фонарь" Марка на всю ширину задницы
             ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#770000';
             ctx.fillRect(-currentW + 1, currentH - 2, (currentW * 2) - 2, 2);
 
-            // Маленькие оранжевые поворотники по самым краям фонаря
             ctx.fillStyle = '#ff9900';
             ctx.fillRect(-currentW + 1, currentH - 2, 2, 2);
             ctx.fillRect(currentW - 3, currentH - 2, 2, 2);
         } else if (currentCarModel === 'egoista') {
-            // Двойные футуристичные стоп-сигналы по краям кузова
             ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#660000';
             ctx.fillRect(-currentW + 1, currentH - 2, 4, 2);
             ctx.fillRect(currentW - 5, currentH - 2, 4, 2);
-
         } else if (currentCarModel === 'ae86') {
-            // Олдскульные квадратные фонари
             ctx.fillRect(-currentW + 1, currentH - 2, 3, 2);
             ctx.fillRect(currentW - 4, currentH - 2, 3, 2);
-
+        } else if (currentCarModel === 'mclaren') {
+            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
+            ctx.fillRect(-currentW + 2, currentH - 1, 5, 2);
+            ctx.fillRect(currentW - 7, currentH - 1, 5, 2);
+        } else if (currentCarModel === 'tuatara') {
+            ctx.fillStyle = (keys.s || keys[' ']) ? '#ff3333' : '#660000';
+            ctx.fillRect(-currentW + 2, currentH - 1, 5, 2);
+            ctx.fillRect(currentW - 7, currentH - 1, 5, 2);
         } else {
             ctx.fillStyle = (keys.s || keys[' ']) ? '#ff1111' : '#550000';
             ctx.fillRect(-11, 24, 4, 2);
             ctx.fillRect(7, 24, 4, 2);
         }
-
 
         // Колёса
         ctx.fillStyle = '#0a0a0c';
@@ -1204,8 +1203,6 @@
 
         ctx.restore();
     }
-
-
 
     // ==========================================
     // ОСНОВНОЙ ЦИКЛ
@@ -1394,6 +1391,7 @@
             }
         }
     }
+
     function renderWorld() {
         ctx.save();
         let shakeIntensity = (isDrifting && speedScalar > 2 && driftSlip > 1.3) ? (Math.random() - 0.5) * (driftSlip * 1.3) : 0;
@@ -1466,7 +1464,6 @@
         ctx.restore();
     }
 
-    updateBalanceUI();
     updateBalanceUI();
 </script>
 </body>
